@@ -25,6 +25,12 @@ if TYPE_CHECKING:
 TIMEOUT_SECONDS = 10.0
 MAX_REDIRECTS = 5
 
+# Largest response body the client will read. A malicious target can
+# otherwise return a multi-gigabyte body and exhaust server memory;
+# callers only ever need the first bytes (evidence is truncated to 500
+# chars), so anything past this is dropped, not buffered.
+MAX_BODY_BYTES = 5 * 1024 * 1024
+
 # Cloud metadata endpoints. 169.254.169.254 is the AWS/GCP/Azure address;
 # 100.100.100.100 is Alibaba Cloud's. Both stay blocked unconditionally.
 METADATA_IPS = frozenset(
@@ -187,6 +193,34 @@ class SsrfSafeClient:
             "POST", url, headers=headers, data=data, follow_redirects=follow_redirects
         )
 
+    def _fetch(
+        self,
+        method: str,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        data: dict[str, str] | None = None,
+    ) -> httpx.Response:
+        """Fetch one URL, reading at most MAX_BODY_BYTES of the response.
+
+        The returned response keeps the real status code, headers, and
+        request, so redirect handling works on it exactly as before; only
+        the body is truncated when the target sends more than the cap.
+        """
+        with self._client.stream(method, url, headers=headers, data=data) as response:
+            body = bytearray()
+            for chunk in response.iter_bytes(chunk_size=65536):
+                remaining = MAX_BODY_BYTES - len(body)
+                if remaining <= 0:
+                    break
+                body += chunk[:remaining]
+            return httpx.Response(
+                response.status_code,
+                headers=response.headers,
+                content=bytes(body),
+                request=response.request,
+            )
+
     def request(
         self,
         method: str,
@@ -198,7 +232,7 @@ class SsrfSafeClient:
     ) -> httpx.Response:
         """Send a request, validating the URL and each redirect target."""
         assert_url_allowed(url, allow_loopback=self._allow_loopback)
-        response = self._client.request(method, url, headers=headers, data=data)
+        response = self._fetch(method, url, headers=headers, data=data)
         redirects = 0
         while (
             follow_redirects
@@ -213,6 +247,6 @@ class SsrfSafeClient:
                 # Browsers turn these into GETs; a POST body must not leak
                 # to the redirect target.
                 method, data = "GET", None
-            response = self._client.request(method, next_url, headers=headers, data=data)
+            response = self._fetch(method, next_url, headers=headers, data=data)
             redirects += 1
         return response

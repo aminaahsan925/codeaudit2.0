@@ -213,3 +213,16 @@ def test_client_from_settings(settings_factory):
     prod_client = SsrfSafeClient.from_settings(prod)
     assert prod_client._allow_loopback is False
     prod_client.close()
+
+
+def test_oversized_body_is_truncated(monkeypatch):
+    monkeypatch.setattr(ssrf_client, "MAX_BODY_BYTES", 1024)
+
+    def handler(request):
+        return httpx.Response(200, content=b"x" * 4096)
+
+    with SsrfSafeClient(allow_loopback=False, transport=httpx.MockTransport(handler)) as client:
+        response = client.get("http://93.184.216.34/big")
+
+    assert response.status_code == 200
+    assert len(response.content) == 1024
