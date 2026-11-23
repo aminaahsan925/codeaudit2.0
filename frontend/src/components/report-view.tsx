@@ -14,21 +14,9 @@ import {
   sharedReportPath,
   type Report,
 } from "@/lib/api";
+import { formatDateTime } from "@/lib/dates";
 import { scoreChangeLabel, VERDICT_SUMMARY } from "@/lib/report";
 import { cn } from "@/lib/utils";
-
-function formatRunDate(iso: string | null): string | null {
-  if (!iso) return null;
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
 
 /**
  * The full Launch Report, shared by /reports/[id] and /r/[token]:
@@ -41,7 +29,7 @@ export function ReportView({ report }: { report: Report }) {
   const pdfUrl = reportPdfUrl(run.id, run.share_token);
   const changeLabel = scoreChangeLabel(score_change);
   const isRerun = run.previous_run_id !== null;
-  const runDate = formatRunDate(run.finished_at ?? run.started_at);
+  const runDate = formatDateTime(run.finished_at ?? run.started_at);
 
   return (
     <div className="flex flex-col gap-10">
