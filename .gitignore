@@ -35,6 +35,9 @@ blob-report/
 /backend/reports/
 /backend/artifacts/
 
+# Demo app runtime data (SQLite files created on first run)
+demo-app/**/shop.db
+
 # Personal editor-assistant settings (shared settings live in .claude/settings.json)
 .claude/settings.local.json
 CLAUDE.local.md

@@ -5,3 +5,7 @@ useDefault = true
 [[allowlists]]
 description = "Deliberately fake secrets in scanner test fixtures"
 paths = ['''^fixtures/[^/]+/''']
+
+[[allowlists]]
+description = "Planted fake demo secret in the demo shop (not a real credential)"
+paths = ['''^demo-app/[^/]+/''']
