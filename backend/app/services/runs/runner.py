@@ -214,22 +214,30 @@ def _journey_stage(
     return findings
 
 
-def _ai_review_stage(findings: list[Finding], review_fn: ReviewFn | None) -> list[Finding]:
+def _ai_review_stage(
+    findings: list[Finding], settings: Settings, review_fn: ReviewFn | None
+) -> list[Finding]:
     """AI review, or the findings unchanged when review is unavailable.
 
     AI review never fails the run: an import failure, a missing module, or
-    a review error all fall through to the unreviewed findings.
+    a review error all fall through to the unreviewed findings. An injected
+    `review_fn` takes findings only; the real `review_findings` also needs
+    settings (for provider keys), so it is called with both.
     """
-    fn = review_fn
-    if fn is None:
+    if review_fn is not None:
         try:
-            from app.services.ai.review import review_findings
-        except ImportError:
-            logger.warning("AI review is not available; continuing without it.")
+            reviewed = review_fn(findings)
+        except Exception:  # AI review never fails the audit
+            logger.exception("AI review failed; continuing with unreviewed findings.")
             return findings
-        fn = review_findings
+        return list(reviewed) if reviewed is not None else findings
     try:
-        reviewed = fn(findings)
+        from app.services.ai.review import review_findings
+    except ImportError:
+        logger.warning("AI review is not available; continuing without it.")
+        return findings
+    try:
+        reviewed = review_findings(findings, settings)
     except Exception:  # AI review never fails the audit
         logger.exception("AI review failed; continuing with unreviewed findings.")
         return findings
@@ -303,7 +311,7 @@ def _run_pipeline(
         _update_status(session_factory, run_id, progress=80)
         findings = dedupe_findings(code_findings + live_findings + journey_findings)
         _update_status(session_factory, run_id, progress=85)
-        findings = _ai_review_stage(findings, review_fn)
+        findings = _ai_review_stage(findings, settings, review_fn)
         _update_status(session_factory, run_id, progress=90)
     _finish_run(session_factory, run, findings)
 

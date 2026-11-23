@@ -489,3 +489,26 @@ def test_review_fn_failure_does_not_fail_run(
     assert finished is not None
     assert finished.status == AuditRunStatus.SUCCEEDED
     assert finished.risk_score == 4.3
+
+
+def test_default_review_sets_ai_verdicts(
+    session_factory: Callable[[], Session], run_settings: Settings, tmp_path: Path
+) -> None:
+    # Regression: the orchestrator once called review_findings(findings)
+    # without settings, so the real review raised TypeError and every run
+    # silently shipped unreviewed findings. With no review_fn injected, the
+    # rule-based fallback must still set an AI verdict on every finding.
+    run = _create_run(session_factory)
+    execute_run(
+        run.id,
+        run_settings,
+        session_factory=session_factory,
+        upload_path=_zip_demo_tree("broken", tmp_path / "broken.zip"),
+    )
+
+    finished = _get_run(session_factory, run.id)
+    assert finished is not None
+    assert finished.status == AuditRunStatus.SUCCEEDED
+    findings = _get_findings(session_factory, run.id)
+    assert findings
+    assert all(finding.ai_verdict is not None for finding in findings)
