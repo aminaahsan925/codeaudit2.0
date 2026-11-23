@@ -1,0 +1,324 @@
+/*
+  LaunchAudit design tokens
+  =========================
+
+  Source of truth for colour, type, spacing and radius. Components use the
+  Tailwind utilities generated from these tokens (bg-sev-critical-tint,
+  text-verdict-launch-fg, text-3xl, max-w-page ...). No ad-hoc colours.
+
+  Colour roles (light / dark values live in :root and .dark below)
+  - Surfaces: background (page), card (raised panel), muted (sunken well),
+    border (hairlines), input (control outlines, >= 3:1 on card).
+  - Text: foreground (body, >= 13:1), muted-foreground (secondary, >= 6:1).
+  - primary: deep petrol ink used for the main action and links.
+  - Severity: critical / high / medium / low. Each has three tokens:
+      sev-<level>        solid mark colour (icons, bars, text on page bg)
+      sev-<level>-tint   badge background
+      sev-<level>-fg     badge text (>= 6.5:1 on its tint)
+    Severity is never colour alone: badges carry the word and a distinct
+    shape (octagon, triangle, diamond, circle).
+  - Verdict: launch / fix (Fix first) / block (Do not launch), same three
+    tokens per verdict, paired with a label and an icon.
+
+  Contrast (WCAG 2.2 AA, checked for both themes)
+  - All text pairs >= 4.5:1; every *-fg on its *-tint >= 6.6:1.
+  - Solid marks >= 3:1 on card, background and their tint; solids also
+    pass 4.5:1 as text on the page background and under white (light) or
+    ink (dark) text.
+  - Focus ring >= 5.5:1 against background and card.
+
+  Type
+  - Sans: Schibsted Grotesk (headings, UI, body). Mono: IBM Plex Mono, only
+    for code, file paths, HTTP evidence and scores.
+  - Scale (classic typographic steps): 12 / 14 / 16 / 18 / 21 / 24 / 36 / 48 / 60 px
+    as text-xs, sm, base, lg, xl, 2xl, 3xl, 4xl, 5xl.
+
+  Spacing: 4px base grid (Tailwind --spacing). Preferred steps 1, 2, 3, 4,
+  6, 8, 12, 16, 24. Page content is capped at max-w-page (76rem) with a
+  px-4 / sm:px-6 / lg:px-8 gutter.
+
+  Radius: hierarchy, not one value. rounded-sm (≈4px) badges and tags,
+  rounded-md (≈5px) buttons and inputs, rounded-lg (6px) panels,
+  rounded-xl (≈8px) large report surfaces.
+
+  Theme: class-based (.dark on <html>) set by next-themes before paint,
+  default follows prefers-color-scheme.
+*/
+
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.3125rem;
+  --text-xl--line-height: 1.875rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl: 2.25rem;
+  --text-3xl--line-height: 2.625rem;
+  --text-4xl: 3rem;
+  --text-4xl--line-height: 3.25rem;
+  --text-5xl: 3.75rem;
+  --text-5xl--line-height: 4rem;
+
+  --container-page: 76rem;
+  --container-prose: 38rem;
+
+  /*
+    Homepage load sequence, played once: the hero mark's scan line passes down
+    the tag (0-0.9s), the tick draws in (0.8-1.4s), then the sample report's
+    risk gauge fills (from 1.3s). Reduced motion jumps to the final frame.
+  */
+  --animate-hero-scan: hero-scan 900ms cubic-bezier(0.4, 0, 0.2, 1) 100ms both;
+  --animate-hero-tick: hero-tick 600ms cubic-bezier(0.3, 0.7, 0.2, 1) 800ms both;
+  --animate-gauge: gauge-in 900ms cubic-bezier(0.2, 0.7, 0.1, 1) 1300ms both;
+
+  @keyframes hero-scan {
+    0% {
+      transform: translateY(2px);
+      opacity: 0;
+    }
+    15%,
+    80% {
+      opacity: 0.55;
+    }
+    100% {
+      transform: translateY(21px);
+      opacity: 0;
+    }
+  }
+
+  @keyframes hero-tick {
+    from {
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes gauge-in {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+}
+
+@theme inline {
+  --font-sans: var(--font-schibsted), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-schibsted), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "Cascadia Mono", monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sev-critical: var(--sev-critical);
+  --color-sev-critical-tint: var(--sev-critical-tint);
+  --color-sev-critical-fg: var(--sev-critical-fg);
+  --color-sev-high: var(--sev-high);
+  --color-sev-high-tint: var(--sev-high-tint);
+  --color-sev-high-fg: var(--sev-high-fg);
+  --color-sev-medium: var(--sev-medium);
+  --color-sev-medium-tint: var(--sev-medium-tint);
+  --color-sev-medium-fg: var(--sev-medium-fg);
+  --color-sev-low: var(--sev-low);
+  --color-sev-low-tint: var(--sev-low-tint);
+  --color-sev-low-fg: var(--sev-low-fg);
+
+  --color-verdict-launch: var(--verdict-launch);
+  --color-verdict-launch-tint: var(--verdict-launch-tint);
+  --color-verdict-launch-fg: var(--verdict-launch-fg);
+  --color-verdict-fix: var(--verdict-fix);
+  --color-verdict-fix-tint: var(--verdict-fix-tint);
+  --color-verdict-fix-fg: var(--verdict-fix-fg);
+  --color-verdict-block: var(--verdict-block);
+  --color-verdict-block-tint: var(--verdict-block-tint);
+  --color-verdict-block-fg: var(--verdict-block-fg);
+  --color-on-solid: var(--on-solid);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  color-scheme: light;
+  --radius: 0.375rem;
+
+  /* Surfaces and text */
+  --background: #f5f7f6;
+  --foreground: #0e1c22;
+  --card: #ffffff;
+  --card-foreground: #0e1c22;
+  --popover: #ffffff;
+  --popover-foreground: #0e1c22;
+  --muted: #eaefee;
+  --muted-foreground: #4a5c61;
+  --secondary: #eaefee;
+  --secondary-foreground: #0e1c22;
+  --accent: #e1e9e8;
+  --accent-foreground: #0e1c22;
+  --border: #d3dcdb;
+  --input: #7e8f91;
+  --ring: #0e6e7a;
+  --primary: #0b5560;
+  --primary-foreground: #ffffff;
+  --destructive: #b3192b;
+  --on-solid: #ffffff;
+
+  /* Severity: solid / tint / fg */
+  --sev-critical: #b3192b;
+  --sev-critical-tint: #fbe3e5;
+  --sev-critical-fg: #8a1220;
+  --sev-high: #b4441a;
+  --sev-high-tint: #fce8dc;
+  --sev-high-fg: #8f3510;
+  --sev-medium: #8a6300;
+  --sev-medium-tint: #faf0cf;
+  --sev-medium-fg: #6a4c00;
+  --sev-low: #3f6e96;
+  --sev-low-tint: #e2ecf5;
+  --sev-low-fg: #274a69;
+
+  /* Verdict: solid / tint / fg */
+  --verdict-launch: #1c7a46;
+  --verdict-launch-tint: #ddf1e4;
+  --verdict-launch-fg: #135c33;
+  --verdict-fix: #975a00;
+  --verdict-fix-tint: #fcedd2;
+  --verdict-fix-fg: #6e4300;
+  --verdict-block: #b3192b;
+  --verdict-block-tint: #fbe3e5;
+  --verdict-block-fg: #8a1220;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: #0b161b;
+  --foreground: #e2eaea;
+  --card: #111f25;
+  --card-foreground: #e2eaea;
+  --popover: #111f25;
+  --popover-foreground: #e2eaea;
+  --muted: #172a31;
+  --muted-foreground: #9aaeb1;
+  --secondary: #172a31;
+  --secondary-foreground: #e2eaea;
+  --accent: #1d333b;
+  --accent-foreground: #e2eaea;
+  --border: #263b42;
+  --input: #5d7379;
+  --ring: #5cc4cf;
+  --primary: #5cc4cf;
+  --primary-foreground: #062126;
+  --destructive: #ff6b78;
+  --on-solid: #062126;
+
+  --sev-critical: #ff6b78;
+  --sev-critical-tint: #3b1318;
+  --sev-critical-fg: #ffc2c8;
+  --sev-high: #ff8f57;
+  --sev-high-tint: #3a1d10;
+  --sev-high-fg: #ffcdb3;
+  --sev-medium: #f2c14e;
+  --sev-medium-tint: #33290c;
+  --sev-medium-fg: #f7dd9a;
+  --sev-low: #7fb2de;
+  --sev-low-tint: #142a3d;
+  --sev-low-fg: #bfd9f0;
+
+  --verdict-launch: #4fd18b;
+  --verdict-launch-tint: #10301f;
+  --verdict-launch-fg: #a6ebc3;
+  --verdict-fix: #f5a524;
+  --verdict-fix-tint: #35240a;
+  --verdict-fix-fg: #fad7a0;
+  --verdict-block: #ff6b78;
+  --verdict-block-tint: #3b1318;
+  --verdict-block-fg: #ffc2c8;
+}
+
+/* Page container: content width cap plus the responsive side gutter. */
+@utility container-page {
+  margin-inline: auto;
+  width: 100%;
+  max-width: var(--container-page);
+  padding-inline: --spacing(4);
+  @media (width >= 40rem) {
+    padding-inline: --spacing(6);
+  }
+  @media (width >= 64rem) {
+    padding-inline: --spacing(8);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/60;
+  }
+  html {
+    @apply font-sans;
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  ::selection {
+    background-color: color-mix(in oklab, var(--primary) 22%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

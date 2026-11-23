@@ -1,4 +1,48 @@
-# Environment files (keep only the examples)
+# Environment files: only examples are committed
 .env
 .env.*
 !.env.example
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+.pnpm-store/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# Tests and coverage
+coverage/
+.coverage
+.coverage.*
+htmlcov/
+playwright-report/
+test-results/
+blob-report/
+
+# Generated audit output (anchored so app routes like src/app/reports stay tracked)
+/reports/
+/artifacts/
+/backend/reports/
+/backend/artifacts/
+
+# Personal editor-assistant settings (shared settings live in .claude/settings.json)
+.claude/settings.local.json
+CLAUDE.local.md
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log
