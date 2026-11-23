@@ -79,6 +79,9 @@ class Settings(BaseSettings):
     database_url: SecretStr
     cors_origins: CommaSeparatedList = Field(default_factory=lambda: ["http://localhost:3000"])
     max_request_bytes: int = Field(default=1_048_576, gt=0)
+    # Live checks and journey runs may target loopback/private addresses
+    # only when this is True AND the environment is not production.
+    allow_loopback_live_checks: bool = False
     api_auth_token: SecretStr | None = None
     log_level: LogLevel = "INFO"
     app_version: str = "0.1.0"
