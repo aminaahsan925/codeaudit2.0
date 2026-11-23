@@ -336,3 +336,25 @@ def test_missing_url_is_skipped(loopback_settings):
     result = run_live_checks_detailed("", loopback_settings, verified=True)
     assert result.status == "skipped"
     assert result.findings == []
+
+
+def test_live_mask_text_masks_connection_string_and_long_token() -> None:
+    from app.services.live.checks import mask_text, redact_body
+
+    masked = mask_text(
+        "DATABASE_URL=postgres://app_user:hunter2secret@db.internal:5432/shop"  # gitleaks:allow
+    )
+    assert masked == "DATABASE_URL=postgres://****@db.internal:5432/shop"
+
+    token = "cd34" * 16  # 64 hex chars, fake value
+    assert token not in mask_text(f"Bearer {token}")
+
+    # An exposed .env excerpt must not redistribute live credentials.
+    env_body = (
+        "APP_ENV=production\n"
+        "DATABASE_URL=postgres://app_user:hunter2secret@db.internal:5432/shop\n"  # gitleaks:allow
+    )
+    excerpt = redact_body(env_body)
+    assert excerpt is not None
+    assert "hunter2secret" not in excerpt
+    assert "db.internal" in excerpt

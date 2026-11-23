@@ -51,6 +51,16 @@ ASSIGNMENT_RE = re.compile(r"""["']?([A-Za-z_][A-Za-z0-9_.]*)["']?\s*(?:=|:)\s*[
 # Unquoted assignment (e.g. .env and YAML lines): NAME=value with no quotes.
 UNQUOTED_ASSIGN_RE = re.compile(r"""([A-Za-z_][A-Za-z0-9_.]*)\s*[:=]\s*([A-Za-z0-9_./+=-]{8,})""")
 
+# Connection strings: postgres://user:password@host/db. The userinfo
+# (credentials) is masked whatever the variable name; the host stays
+# visible because it is the useful part of the evidence.
+CONNECTION_USERINFO_RE = re.compile(r"([A-Za-z][A-Za-z0-9+.-]*://)([^/@\s]+@)")
+
+# Bare high-entropy tokens with no assignment context (JWT segments, long
+# hex/base64 keys). 40 chars is past any English word or normal identifier;
+# "/" is excluded so file paths and URLs are not mangled.
+LONG_TOKEN_RE = re.compile(r"[A-Za-z0-9_\-+=]{40,}")
+
 
 def mask_secret(value: str) -> str:
     """Show at most the first 4 chars of a secret, then ****."""
@@ -90,6 +100,8 @@ def mask_text(text: str) -> str:
     masked = text
     for pattern in KNOWN_PREFIX_RES:
         masked = pattern.sub(lambda m: mask_secret(m.group(0)), masked)
+    masked = CONNECTION_USERINFO_RE.sub(r"\1****@", masked)
+    masked = LONG_TOKEN_RE.sub(lambda m: mask_secret(m.group(0)), masked)
 
     def _mask_assignment(match: re.Match[str]) -> str:
         name, value = match.group(1), match.group(2)

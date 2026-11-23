@@ -75,6 +75,16 @@ SECRET_NAME_KEYWORDS = (
 QUOTED_ASSIGN_RE = re.compile(r"""([A-Za-z_][A-Za-z0-9_.]*)\s*[:=]\s*["']([^"']{8,})["']""")
 UNQUOTED_ASSIGN_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_.]*)\s*=\s*([A-Za-z0-9_./+=-]{8,})")
 
+# Connection strings: postgres://user:password@host/db. The userinfo
+# (credentials) is masked whatever the variable name; the host stays
+# visible because it is the useful part of the evidence.
+CONNECTION_USERINFO_RE = re.compile(r"([A-Za-z][A-Za-z0-9+.-]*://)([^/@\s]+@)")
+
+# Bare high-entropy tokens with no assignment context (JWT segments, long
+# hex/base64 keys). 40 chars is past any English word or normal identifier;
+# "/" is excluded so file paths and URLs are not mangled.
+LONG_TOKEN_RE = re.compile(r"[A-Za-z0-9_\-+=]{40,}")
+
 
 class LiveAppUnreachableError(RuntimeError):
     """Raised when the home page cannot be fetched at all."""
@@ -108,6 +118,8 @@ def mask_text(text: str) -> str:
     masked = text
     for pattern in KNOWN_PREFIX_RES:
         masked = pattern.sub(lambda match: mask_secret(match.group(0)), masked)
+    masked = CONNECTION_USERINFO_RE.sub(r"\1****@", masked)
+    masked = LONG_TOKEN_RE.sub(lambda match: mask_secret(match.group(0)), masked)
 
     def _mask_quoted(match: re.Match[str]) -> str:
         name, value = match.group(1), match.group(2)
