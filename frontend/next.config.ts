@@ -20,7 +20,8 @@ const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  // Journey and finding screenshots are served by the API origin.
+  `img-src 'self' data: blob: ${apiOrigin}`,
   "font-src 'self'",
   `connect-src 'self' ${apiOrigin}`,
   "object-src 'none'",
