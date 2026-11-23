@@ -4,3 +4,30 @@ export { ApiError, isApiError } from "./errors";
 export type { ApiErrorCode } from "./errors";
 export { getHealth } from "./health";
 export type { Health } from "./health";
+export { createRun, getRun, rerunRun, CREATE_RUN_TIMEOUT_MS } from "./runs";
+export type {
+  AuditRun,
+  AuditRunStatus,
+  CreateRunInput,
+  RerunRequest,
+} from "./runs";
+export {
+  getReport,
+  getSharedReport,
+  reportPdfUrl,
+  sharedReportPath,
+} from "./reports";
+export type {
+  AIVerdict,
+  AIVerdictLabel,
+  Confidence,
+  Evidence,
+  Finding,
+  FindingCategory,
+  FindingEngine,
+  FindingStatus,
+  HttpEvidence,
+  JourneyStepView,
+  Report,
+  TraceStep,
+} from "./reports";
