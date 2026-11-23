@@ -1,0 +1,42 @@
+[project]
+name = "launchaudit-backend"
+version = "0.1.0"
+description = "LaunchAudit API"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "alembic>=1.20",
+    "fastapi>=0.165",
+    "psycopg[binary]>=3.3",
+    "pydantic>=2.14",
+    "pydantic-settings>=2.16",
+    "sqlalchemy>=2.1",
+    "uvicorn[standard]>=0.54",
+]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28",
+    "pytest>=9.2",
+    "ruff>=0.17",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "ASYNC", "N", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
