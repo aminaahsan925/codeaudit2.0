@@ -100,6 +100,12 @@ when a decision changes (say what replaced it and why).
   (Launch/Fix first/Do not launch) tokens in light and dark mode, all
   WCAG AA; badges always pair colour with a word and a distinct shape or icon.
   Tokens live in `frontend/src/app/globals.css`.
+- **Homepage shows proof, not claims**: the hero's sample report is
+  interactive. Each finding opens to the proof a real report attaches (source
+  with the flagged line and a data-flow trace, a live HTTP exchange, or
+  response headers). "What it looks for" pairs every check with a specimen of
+  the proof it produces. Motion is limited to the one load sequence on the
+  hero mark and responses to clicks.
 - **Containers**: the backend image runs as a non-root user (uid 10001) with a
   read-only filesystem in Compose; ports bind to 127.0.0.1 only.
 - **Supply chain pinning**: Docker base images are pinned by digest, GitHub
