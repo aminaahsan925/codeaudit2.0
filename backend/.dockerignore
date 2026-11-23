@@ -1,0 +1,24 @@
+# Secrets and local environment
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Virtualenv, caches, build output
+.venv
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.coverage
+.coverage.*
+htmlcov
+
+# Not needed in the runtime image
+tests
+openapi.json
+Dockerfile
+.dockerignore
+.git
+.gitignore
