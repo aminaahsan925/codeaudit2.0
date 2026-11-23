@@ -38,6 +38,7 @@ def _model_to_schema(model: AuditRunModel) -> AuditRun:
         error=model.error,
         share_token=model.share_token,
         is_guest=model.is_guest,
+        journey_steps=model.journey_steps,
         previous_run_id=model.previous_run_id,
         domain_verified=model.domain_verified,
     )
@@ -58,6 +59,7 @@ def _schema_to_model(run: AuditRun, owner: str | None) -> AuditRunModel:
         error=run.error,
         share_token=run.share_token,
         is_guest=run.is_guest,
+        journey_steps=run.journey_steps,
         previous_run_id=run.previous_run_id,
         domain_verified=run.domain_verified,
         owner=owner,
