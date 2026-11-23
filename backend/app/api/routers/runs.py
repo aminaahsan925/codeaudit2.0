@@ -9,6 +9,7 @@ never persisted.
 
 from __future__ import annotations
 
+import re
 import secrets
 import shutil
 from pathlib import Path
@@ -47,8 +48,13 @@ router = APIRouter(prefix="/runs", tags=["runs"])
 
 _ARTIFACT_MEDIA_TYPES = {
     ".png": "image/png",
-    ".pdf": "application/pdf",
 }
+
+# Only journey screenshots are downloadable as artifacts. The stored
+# upload zip (and anything else in the run dir) must never be served over
+# HTTP: it holds the user's full source, including every secret the
+# scanners carefully mask in findings. Reruns reuse the zip server-side.
+_SCREENSHOT_NAME_RE = re.compile(r"step-\d{2}-[a-z0-9-]+\.png")
 
 
 def _check_journey_credentials(journey_email: str | None, journey_password: str | None) -> None:
@@ -216,6 +222,8 @@ async def rerun_run(
 def get_artifact(run_id: UUID, name: str, settings: SettingsDep) -> FileResponse:
     run_dir = settings.artifact_dir / str(run_id)
     if not name or "/" in name or "\\" in name or name in (".", ".."):
+        raise NotFoundError("Artifact not found.")
+    if _SCREENSHOT_NAME_RE.fullmatch(name) is None:
         raise NotFoundError("Artifact not found.")
     path = (run_dir / name).resolve()
     if not path.is_relative_to(run_dir.resolve()) or not path.is_file():

@@ -449,16 +449,22 @@ def test_artifact_serving(client: TestClient, tmp_path: Path) -> None:
     artifact_dir.mkdir(parents=True)
     (artifact_dir / "step-04-checkout.png").write_bytes(b"\x89PNG fake image")
     (artifact_dir / "report.pdf").write_bytes(b"%PDF fake pdf")
+    (artifact_dir / "upload.zip").write_bytes(b"PK fake zip")
 
     png = client.get(f"/api/runs/{run_id}/artifacts/step-04-checkout.png")
     assert png.status_code == 200
     assert png.headers["content-type"] == "image/png"
     assert png.content == b"\x89PNG fake image"
 
+    # Only journey screenshots are downloadable: the stored upload zip
+    # holds the user's full source (including masked secrets) and must
+    # never be served, and PDFs have their own endpoint.
     pdf = client.get(f"/api/runs/{run_id}/artifacts/report.pdf")
-    assert pdf.status_code == 200
-    assert pdf.headers["content-type"] == "application/pdf"
-    assert pdf.content == b"%PDF fake pdf"
+    assert pdf.status_code == 404
+    assert pdf.json()["error"]["code"] == "not_found"
+    zipped = client.get(f"/api/runs/{run_id}/artifacts/upload.zip")
+    assert zipped.status_code == 404
+    assert zipped.json()["error"]["code"] == "not_found"
 
 
 def test_artifact_missing_is_404(client: TestClient) -> None:

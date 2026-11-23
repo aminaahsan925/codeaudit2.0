@@ -148,8 +148,10 @@ Authenticated when the original run was owned, else public by id. Returns
 
 ### `GET /api/runs/{run_id}/artifacts/{name}`
 
-Serves a stored artifact (journey screenshot PNG, uploaded zip). `name` must
-be a plain filename; path traversal is rejected with `404`.
+Serves a stored journey screenshot PNG (`step-01-signup.png` ..
+`step-04-checkout.png`). `name` must be a plain filename; path traversal
+is rejected with `404`. Only screenshots are served: the stored upload
+zip is never downloadable over HTTP (reruns reuse it server-side).
 
 ### `GET /api/runs/{run_id}/report`
 
