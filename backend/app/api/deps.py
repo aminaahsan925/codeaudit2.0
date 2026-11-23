@@ -28,6 +28,33 @@ SettingsDep = Annotated[Settings, Depends(get_app_settings)]
 DbSession = Annotated[Session, Depends(get_db)]
 
 
+def authenticate_optional(
+    settings: Settings,
+    credentials: HTTPAuthorizationCredentials | None,
+) -> Principal | None:
+    """Validate an optional bearer token.
+
+    Returns None when no token was presented (guest). Returns the principal
+    for a valid token. Raises UnauthorizedError for a presented token that
+    does not verify, so a bad token never silently becomes a guest.
+    """
+    if credentials is None:
+        return None
+    if settings.is_production:
+        raise UnauthorizedError("Missing or invalid bearer token.")
+    if not verify_bearer_token(credentials.credentials, settings.api_auth_token):
+        raise UnauthorizedError("Missing or invalid bearer token.")
+    return Principal(subject="dev")
+
+
+def optional_auth(
+    settings: SettingsDep,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+) -> Principal | None:
+    """Optional auth: a valid token gives a principal, no token gives None."""
+    return authenticate_optional(settings, credentials)
+
+
 def require_auth(
     settings: SettingsDep,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
@@ -38,12 +65,11 @@ def require_auth(
     constant time, mapped to the subject "dev". It never authenticates anyone
     in production, even if settings validation were bypassed.
     """
-    if settings.is_production:
+    principal = authenticate_optional(settings, credentials)
+    if principal is None:
         raise UnauthorizedError("Missing or invalid bearer token.")
-    token = credentials.credentials if credentials is not None else None
-    if not verify_bearer_token(token, settings.api_auth_token):
-        raise UnauthorizedError("Missing or invalid bearer token.")
-    return Principal(subject="dev")
+    return principal
 
 
 CurrentPrincipal = Annotated[Principal, Depends(require_auth)]
+OptionalPrincipal = Annotated[Principal | None, Depends(optional_auth)]
