@@ -6,7 +6,7 @@ the same PR that changes it.
 | # | Feature | Description | Status |
 |---|---|---|---|
 | 0 | Project foundation | Repo structure, backend and frontend skeletons, design system, CI, security baseline | In progress |
-| 1 | One-click audit run | Add a GitHub repo or zip plus the live URL, press Run, follow progress | Not started |
+| 1 | One-click audit run | Add a GitHub repo or zip plus the live URL, press Run, follow progress | Done |
 | 2 | Code scanner with evidence | Semgrep, gitleaks and OSV scans normalised into Findings with file, line, snippet and data-flow trace | Done |
 | 3 | Vibe-coding checks | Supabase RLS, exposed keys, open Firebase rules, unauthenticated routes | Done |
 | 4 | Live app security checks | Header, TLS, exposure and auth checks against the live URL, only after domain ownership verification, through an SSRF-safe client | Done |
