@@ -41,15 +41,223 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reports/shared/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Full report by share token (public) */
+        get: operations["get_shared_report_api_reports_shared__token__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List my audit runs */
+        get: operations["list_runs_api_runs_get"];
+        put?: never;
+        /** Start an audit run */
+        post: operations["create_run_api_runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get an audit run */
+        get: operations["get_run_api_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/artifacts/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a run artifact */
+        get: operations["get_artifact_api_runs__run_id__artifacts__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Full report for a run */
+        get: operations["get_run_report_api_runs__run_id__report_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/report.pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Report PDF for a run */
+        get: operations["get_run_report_pdf_api_runs__run_id__report_pdf_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/rerun": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Re-run an audit after fixes */
+        post: operations["rerun_run_api_runs__run_id__rerun_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AIVerdict */
+        AIVerdict: {
+            /** Quoted Code */
+            quoted_code: string;
+            /** Reason */
+            reason: string;
+            verdict: components["schemas"]["AIVerdictLabel"];
+        };
+        /**
+         * AIVerdictLabel
+         * @enum {string}
+         */
+        AIVerdictLabel: "confirmed" | "likely_false_positive" | "needs_review";
+        /** AuditRun */
+        AuditRun: {
+            /**
+             * Domain Verified
+             * @default false
+             */
+            domain_verified: boolean;
+            /** Error */
+            error: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Is Guest
+             * @default false
+             */
+            is_guest: boolean;
+            /** Journey Steps */
+            journey_steps: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Live Url */
+            live_url: string | null;
+            /** Previous Run Id */
+            previous_run_id: string | null;
+            /**
+             * Progress
+             * @default 0
+             */
+            progress: number;
+            /** Project Name */
+            project_name: string;
+            /** Repo Url */
+            repo_url: string | null;
+            /** Risk Score */
+            risk_score: number | null;
+            /** Share Token */
+            share_token: string | null;
+            /** Started At */
+            started_at: string | null;
+            /** @default queued */
+            status: components["schemas"]["AuditRunStatus"];
+            verdict: components["schemas"]["Verdict"] | null;
+        };
+        /**
+         * AuditRunStatus
+         * @enum {string}
+         */
+        AuditRunStatus: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+        /** Body_create_run_api_runs_post */
+        Body_create_run_api_runs_post: {
+            /** Domain Token */
+            domain_token?: string | null;
+            /** Journey Email */
+            journey_email?: string | null;
+            /** Journey Password */
+            journey_password?: string | null;
+            /** Live Url */
+            live_url?: string | null;
+            /** Project Name */
+            project_name: string;
+            /** Repo Url */
+            repo_url?: string | null;
+            /** Zip File */
+            zip_file?: string | null;
+        };
+        /**
+         * Confidence
+         * @enum {string}
+         */
+        Confidence: "high" | "medium" | "low";
         /**
          * ErrorCode
          * @enum {string}
          */
-        ErrorCode: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "method_not_allowed" | "payload_too_large" | "validation_error" | "internal_error";
+        ErrorCode: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "method_not_allowed" | "payload_too_large" | "validation_error" | "rate_limited" | "internal_error";
         /** ErrorDetail */
         ErrorDetail: {
             code: components["schemas"]["ErrorCode"];
@@ -63,6 +271,74 @@ export interface components {
         ErrorResponse: {
             error: components["schemas"]["ErrorDetail"];
         };
+        /**
+         * Evidence
+         * @description Engine-specific proof. Every key is optional (and may be omitted).
+         */
+        Evidence: {
+            http?: components["schemas"]["HttpEvidence"] | null;
+            /** Notes */
+            notes?: string | null;
+            package?: components["schemas"]["PackageEvidence"] | null;
+            /** Screenshot Url */
+            screenshot_url?: string | null;
+            /** Secret Preview */
+            secret_preview?: string | null;
+        };
+        /** Finding */
+        Finding: {
+            ai_verdict: components["schemas"]["AIVerdict"] | null;
+            category: components["schemas"]["FindingCategory"];
+            confidence: components["schemas"]["Confidence"];
+            /** Cwe */
+            cwe: string | null;
+            /** End Line */
+            end_line: number | null;
+            engine: components["schemas"]["FindingEngine"];
+            evidence: components["schemas"]["Evidence"];
+            /** File */
+            file: string | null;
+            /** Fix Guidance */
+            fix_guidance: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Rule Id */
+            rule_id: string;
+            severity: components["schemas"]["Severity"];
+            /** Snippet */
+            snippet: string | null;
+            /** Start Line */
+            start_line: number | null;
+            /** @default open */
+            status: components["schemas"]["FindingStatus"];
+            /** Title */
+            title: string;
+            /** Trace */
+            trace: components["schemas"]["TraceStep"][];
+        };
+        /**
+         * FindingCategory
+         * @enum {string}
+         */
+        FindingCategory: "secrets" | "injection" | "auth" | "access_control" | "config" | "dependency" | "ssrf" | "xss" | "data_exposure" | "other";
+        /**
+         * FindingEngine
+         * @enum {string}
+         */
+        FindingEngine: "native" | "semgrep" | "gitleaks" | "osv" | "vibe" | "live" | "journey" | "ai";
+        /**
+         * FindingStatus
+         * @enum {string}
+         */
+        FindingStatus: "open" | "fixed" | "ignored" | "false_positive";
+        /** HTTPValidationError */
+        HTTPValidationError: {
+            /** Detail */
+            detail?: components["schemas"]["ValidationError"][];
+        };
         /** HealthResponse */
         HealthResponse: {
             /**
@@ -73,6 +349,39 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** HttpEvidence */
+        HttpEvidence: {
+            /** Body Excerpt */
+            body_excerpt: string | null;
+            /** Method */
+            method: string;
+            /** Request Headers */
+            request_headers: {
+                [key: string]: string;
+            };
+            /** Response Headers */
+            response_headers: {
+                [key: string]: string;
+            };
+            /** Status */
+            status: number;
+            /** Url */
+            url: string;
+        };
+        /**
+         * JourneyStepView
+         * @description One journey step as shown on the report.
+         */
+        JourneyStepView: {
+            /** Error */
+            error: string | null;
+            /** Name */
+            name: string;
+            /** Screenshot Url */
+            screenshot_url: string | null;
+            /** Status */
+            status: string;
+        };
         /**
          * MeResponse
          * @description The authenticated principal.
@@ -81,6 +390,89 @@ export interface components {
             /** Subject */
             subject: string;
         };
+        /** PackageEvidence */
+        PackageEvidence: {
+            /** Advisory */
+            advisory: string;
+            /** Name */
+            name: string;
+            /** Version */
+            version: string;
+        };
+        /**
+         * ReportResponse
+         * @description Full report for one audit run, findings in fix-first order.
+         */
+        ReportResponse: {
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /** Findings */
+            findings: components["schemas"]["Finding"][];
+            /** Journey Steps */
+            journey_steps: components["schemas"]["JourneyStepView"][];
+            /** Previous Risk Score */
+            previous_risk_score: number | null;
+            /** Resolved Findings */
+            resolved_findings: components["schemas"]["Finding"][];
+            run: components["schemas"]["AuditRun"];
+            /** Score Change */
+            score_change: number | null;
+        };
+        /**
+         * RerunRequest
+         * @description Fresh per-run inputs for a rerun.
+         *
+         *     Journey credentials are never persisted: a rerun copies only the
+         *     project name, repo URL and live URL from the original run, so the
+         *     caller supplies fresh credentials (and a fresh domain token) here.
+         */
+        RerunRequest: {
+            /** Domain Token */
+            domain_token?: string | null;
+            /** Journey Email */
+            journey_email?: string | null;
+            /** Journey Password */
+            journey_password?: string | null;
+        };
+        /**
+         * Severity
+         * @enum {string}
+         */
+        Severity: "critical" | "high" | "medium" | "low";
+        /**
+         * TraceStep
+         * @description One step of a data-flow trace from source to sink.
+         */
+        TraceStep: {
+            /** File */
+            file: string;
+            /** Label */
+            label: string;
+            /** Line */
+            line: number;
+            /** Snippet */
+            snippet: string;
+        };
+        /** ValidationError */
+        ValidationError: {
+            /** Context */
+            ctx?: Record<string, never>;
+            /** Input */
+            input?: unknown;
+            /** Location */
+            loc: (string | number)[];
+            /** Message */
+            msg: string;
+            /** Error Type */
+            type: string;
+        };
+        /**
+         * Verdict
+         * @enum {string}
+         */
+        Verdict: "launch" | "fix_first" | "do_not_launch";
     };
     responses: never;
     parameters: never;
@@ -135,6 +527,388 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    get_shared_report_api_reports_shared__token__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_runs_api_runs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditRun"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_run_api_runs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_create_run_api_runs_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditRun"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_run_api_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditRun"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_artifact_api_runs__run_id__artifacts__name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_report_api_runs__run_id__report_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_report_pdf_api_runs__run_id__report_pdf_get: {
+        parameters: {
+            query?: {
+                /** @description Share token for public access */
+                token?: string | null;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rerun_run_api_runs__run_id__rerun_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RerunRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditRun"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
