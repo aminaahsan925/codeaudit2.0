@@ -88,7 +88,10 @@ pnpm dev
 ```
 
 Open <http://localhost:3000>. The header badge shows whether the backend is
-reachable.
+reachable. Use `localhost`, not `127.0.0.1`, with the dev server: the dev
+server does not hydrate pages served from `127.0.0.1:3000` (verified
+2026-11-23; the production build hydrates on both origins, so the deployed
+app is unaffected).
 
 ### Run Postgres + backend with Docker
 
