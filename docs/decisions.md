@@ -141,6 +141,51 @@ when a decision changes (say what replaced it and why).
   vibe-coding checks. Pinned in `skills-lock.json`.
 - **MCP**: Context7 for current library docs; no keys required.
 
+## Launchpad build (Nov 2026)
+
+Decisions made while building features 1-10 for the LaunchPad Hacks entry.
+All feature work landed on the local integration branch
+`feat/launchpad-build`, with feature branches created from
+`feat/project-foundation` (main only holds the initial repository seed).
+
+- **Scoring**: severity weights Critical 3.0, High 2.0, Medium 1.0, Low 0.3;
+  risk score = min(10, sum of weights), one decimal. Verdict: risk <= 2.0
+  Launch, 2.1-5.0 Fix first, > 5.0 Do not launch. Implemented as pure
+  functions in `backend/app/services/report/scoring.py`.
+- **SQLite for development and test**: `DATABASE_URL` accepts `sqlite://`
+  outside production; production still requires `postgresql+psycopg://`.
+  Lets the whole stack run locally without a Postgres server. ORM types stay
+  portable (no Postgres-specific types).
+- **Request size**: `max_request_bytes` default is 10 MiB (was 1 MiB) so zip
+  uploads fit. Zip extraction additionally enforces its own caps (50 MiB
+  total, 2000 files) and rejects path traversal and symlinks.
+- **Loopback targets**: live checks and journey runs may target
+  loopback/private addresses only when `allow_loopback_live_checks` is True
+  and the environment is not production. A loopback target in that mode
+  counts as domain-verified, since localhost ownership cannot be proven
+  with a token file. Public hosts always need the verification token.
+- **Report visibility**: `GET /api/runs/{id}` and
+  `GET /api/runs/{id}/report` are public by id (run ids are unguessable
+  UUIDs), so a guest who ran an audit can open its report from the link.
+  The share token is the designed public link for sharing with others. PDF
+  download needs a bearer token or the share token. `GET /api/runs`
+  (history) needs auth.
+- **Pipeline execution**: runs execute in FastAPI `BackgroundTasks`; the
+  engine services are synchronous and run in threads. Progress is polled
+  (`GET /api/runs/{id}`); no websockets for this build.
+- **AI review never fails a run**: provider errors, timeouts, and quote
+  mismatches fall back to rule-based review for that finding, and a review
+  failure never fails the audit. A report is always produced.
+- **Reruns**: a rerun is a new run with `previous_run_id` set. Findings are
+  matched by stable key (rule + file:line / step / path); previous findings
+  absent from the new run are marked `fixed`, and the report shows resolved
+  findings plus the score change.
+- **Demo app**: `demo-app/` holds broken and fixed variants of a small shop
+  for the fail-fix-pass demo. The planted fake key is allowlisted in
+  `.gitleaks.toml`; it is a fake demo key, never a real credential.
+- **Native engine**: the built-in scan rules use engine `native`, distinct
+  from `semgrep`/`gitleaks`/`osv` tool findings.
+
 ## Tooling
 
 - **pnpm is installed with npm, not corepack**: pnpm 12 ships as a native

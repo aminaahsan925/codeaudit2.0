@@ -9,7 +9,7 @@ from fastapi.responses import Response
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentPrincipal, DbSession, SettingsDep, bearer_scheme
+from app.api.deps import DbSession, SettingsDep, bearer_scheme
 from app.core.config import Settings
 from app.core.errors import NotFoundError, UnauthorizedError
 from app.core.security import verify_bearer_token
@@ -25,20 +25,8 @@ router = APIRouter(tags=["reports"])
 
 
 def _previous_run_id(run: AuditRun) -> UUID | None:
-    """The run this one reran, if any.
-
-    `previous_run_id` lands on the AuditRun schema with the audit-run
-    worker; until then it is absent and every run is treated as a first run.
-    """
-    raw = getattr(run, "previous_run_id", None)
-    if raw is None:
-        return None
-    if isinstance(raw, UUID):
-        return raw
-    try:
-        return UUID(str(raw))
-    except ValueError:
-        return None
+    """The run this one reran, if any."""
+    return run.previous_run_id
 
 
 def _report_for_run(session: Session, run: AuditRun) -> ReportResponse:
@@ -64,11 +52,9 @@ def _load_run(session: Session, run_id: UUID) -> AuditRun:
     "/runs/{run_id}/report",
     summary="Full report for a run",
     response_model=ReportResponse,
-    responses=error_responses(401, 404),
+    responses=error_responses(404),
 )
-def get_run_report(
-    run_id: UUID, _principal: CurrentPrincipal, session: DbSession
-) -> ReportResponse:
+def get_run_report(run_id: UUID, session: DbSession) -> ReportResponse:
     return _report_for_run(session, _load_run(session, run_id))
 
 

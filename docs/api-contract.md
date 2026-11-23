@@ -9,7 +9,7 @@ document describes intent, the OpenAPI schema is the machine-readable truth.
 
 - JSON only, `snake_case` fields, timestamps in ISO 8601 UTC (`2026-11-23T18:00:00Z`).
 - IDs are UUID v4 strings.
-- Request bodies larger than `MAX_REQUEST_BYTES` (default 1 MB) are rejected with `413`.
+- Request bodies larger than `MAX_REQUEST_BYTES` (default 10 MB) are rejected with `413`.
 - Authenticated endpoints expect `Authorization: Bearer <token>`.
 
 ### Error format
@@ -29,6 +29,7 @@ Every non-2xx response has this shape. No stack traces or internal details are e
 | 405 | `method_not_allowed` | Wrong HTTP method |
 | 413 | `payload_too_large` | Body over the size limit |
 | 422 | `validation_error` | Body/query failed validation |
+| 429 | `rate_limited` | Too many audit runs in the last hour |
 | 500 | `internal_error` | Unexpected server error (logged server-side) |
 
 ## Endpoints (foundation)
@@ -62,7 +63,7 @@ One problem found by any engine, with the evidence that proves it.
 |---|---|---|
 | `id` | uuid | |
 | `rule_id` | string | Engine rule, e.g. `python.lang.security.audit.subprocess-shell-true` |
-| `engine` | enum | `semgrep`, `gitleaks`, `osv`, `vibe`, `live`, `journey`, `ai` |
+| `engine` | enum | `native`, `semgrep`, `gitleaks`, `osv`, `vibe`, `live`, `journey`, `ai` |
 | `category` | enum | `secrets`, `injection`, `auth`, `access_control`, `config`, `dependency`, `ssrf`, `xss`, `data_exposure`, `other` |
 | `severity` | enum | `critical`, `high`, `medium`, `low` |
 | `confidence` | enum | `high`, `medium`, `low` |
@@ -108,3 +109,61 @@ One problem found by any engine, with the evidence that proves it.
 | `started_at` | datetime \| null | |
 | `finished_at` | datetime \| null | |
 | `error` | string \| null | Safe, user-facing message when `status = failed` |
+| `share_token` | string \| null | Unguessable token for the public share link |
+| `is_guest` | boolean | True when the run was created without a bearer token |
+| `journey_steps` | object[] \| null | Stored journey steps (`name`, `status`, `screenshot`, `error`) |
+| `previous_run_id` | uuid \| null | The run this one reran, if any |
+| `domain_verified` | boolean | Whether the live URL's domain was verified for this run |
+
+## Endpoints (audit runs and reports)
+
+### `POST /api/runs`
+
+Multipart form. Creates an audit run and starts the pipeline in the
+background. Guest runs need no token; a valid bearer token marks the run
+owned (`dev`) so it appears in history. Rate-limited per token or client IP
+(`audit_rate_limit_per_hour`, default 10).
+
+Form fields: `project_name` (required), `repo_url` (https github.com URL),
+`live_url`, `zip_file` (a `.zip` upload), `journey_email`,
+`journey_password`, `domain_token`. At least one of `repo_url` or `zip_file`
+is required. Journey credentials are held in memory for the run only and are
+never stored. Returns `201` with the `AuditRun` (`status = queued`).
+
+### `GET /api/runs/{run_id}`
+
+Public by id. Returns the `AuditRun` with current `status` and `progress`.
+
+### `GET /api/runs`
+
+Authenticated. Lists runs owned by `dev`, newest first.
+
+### `POST /api/runs/{run_id}/rerun`
+
+Creates a new run from a previous run's inputs (project name, repo URL, live
+URL; zip reruns reuse the stored upload). Accepts fresh journey credentials
+and a fresh domain token in the body. The new run records `previous_run_id`.
+Authenticated when the original run was owned, else public by id. Returns
+`201` with the new `AuditRun`.
+
+### `GET /api/runs/{run_id}/artifacts/{name}`
+
+Serves a stored artifact (journey screenshot PNG, uploaded zip). `name` must
+be a plain filename; path traversal is rejected with `404`.
+
+### `GET /api/runs/{run_id}/report`
+
+Public by id (run ids are unguessable UUIDs). Returns the full
+`ReportResponse`: the run, fix-first findings, severity counts, journey
+steps, and for reruns the previous risk score, resolved findings, and score
+change.
+
+### `GET /api/reports/shared/{token}`
+
+Public. Returns the `ReportResponse` for the run with that share token.
+`404` for an unknown token.
+
+### `GET /api/runs/{run_id}/report.pdf`
+
+Returns the Launch Report as a PDF download. Requires a valid bearer token
+or a matching `?token=<share_token>` query parameter (`401` otherwise).

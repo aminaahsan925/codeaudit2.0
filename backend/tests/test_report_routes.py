@@ -125,21 +125,20 @@ def test_get_report_returns_fix_first_findings(
     assert body["run"]["risk_score"] == 8.3
     assert [f["rule_id"] for f in body["findings"]] == ["SECRET_GENERIC", "DEBUG_MODE"]
     assert body["counts"] == {"critical": 1, "high": 0, "medium": 0, "low": 1}
-    # The journey_steps ORM column lands on the audit-run branch; until then
-    # the repository returns the schema default.
+    # The seeded run has no journey steps stored.
     assert body["journey_steps"] == []
     assert body["previous_risk_score"] is None
     assert body["resolved_findings"] == []
     assert body["score_change"] is None
 
 
-def test_get_report_without_auth_is_401(report_client: TestClient, seeded_run: AuditRun) -> None:
+def test_get_report_is_public_without_auth(report_client: TestClient, seeded_run: AuditRun) -> None:
+    # Report by run id is public (run ids are unguessable UUIDs), so a guest
+    # who ran an audit can open its report from the link.
     response = report_client.get(f"/api/runs/{seeded_run.id}/report")
 
-    assert response.status_code == 401
-    assert response.json() == {
-        "error": {"code": "unauthorized", "message": "Missing or invalid bearer token."}
-    }
+    assert response.status_code == 200
+    assert response.json()["run"]["id"] == str(seeded_run.id)
 
 
 def test_get_report_missing_run_is_404(report_client: TestClient, api_token: str) -> None:
