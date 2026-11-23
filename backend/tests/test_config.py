@@ -150,7 +150,10 @@ def test_cors_origins_accepts_json_array(clean_env: pytest.MonkeyPatch) -> None:
 def test_cors_origins_default(clean_env: pytest.MonkeyPatch) -> None:
     clean_env.setenv("DATABASE_URL", VALID_DB_URL)
 
-    assert get_settings().cors_origins == ["http://localhost:3000"]
+    assert get_settings().cors_origins == [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
 
 
 def test_defaults(clean_env: pytest.MonkeyPatch) -> None:
