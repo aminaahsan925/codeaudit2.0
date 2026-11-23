@@ -16,10 +16,15 @@ from app.core.config import get_settings
 @lru_cache(maxsize=1)
 def get_engine() -> Engine:
     settings = get_settings()
+    url = settings.database_url.get_secret_value()
+    # SQLite connections are single-threaded by default; the API serves
+    # requests on a thread pool, so allow sharing the connection.
+    connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
     return create_engine(
-        settings.database_url.get_secret_value(),
+        url,
         pool_pre_ping=True,
         hide_parameters=True,
+        connect_args=connect_args,
     )
 
 
