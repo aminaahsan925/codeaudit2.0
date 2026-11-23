@@ -73,8 +73,8 @@ def test_streamed_body_under_limit_passes(small_client: TestClient) -> None:
     assert response.json() == {"size": LIMIT - 20}
 
 
-def test_default_limit_is_one_megabyte(client: TestClient) -> None:
-    response = client.post("/api/health", content=b"x" * (1_048_576 + 1))
+def test_default_limit_is_ten_megabytes(client: TestClient) -> None:
+    response = client.post("/api/health", content=b"x" * (10_485_760 + 1))
 
     assert_payload_too_large(response)
 
