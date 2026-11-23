@@ -1,4 +1,5 @@
 import { ButtonLink } from "@/components/button-link";
+import { HeroMark } from "@/components/hero-mark";
 import { SampleReport } from "@/components/sample-report";
 
 const STEPS = [
@@ -48,19 +49,15 @@ export default function HomePage() {
     <>
       <section aria-labelledby="hero-title" className="border-b">
         <div className="container-page grid gap-12 py-12 sm:py-16 lg:grid-cols-12 lg:gap-10 lg:py-24">
-          <div className="flex flex-col gap-6 lg:col-span-6 lg:pt-6">
+          <div className="flex flex-col gap-10 lg:col-span-6 lg:self-center">
             <h1
               id="hero-title"
-              className="text-4xl font-bold tracking-[-0.035em] text-balance sm:text-5xl"
+              className="flex items-center gap-3 text-3xl font-bold tracking-[-0.035em] sm:gap-5 sm:text-5xl"
             >
-              Check your app before you launch it.
+              <HeroMark className="size-12 sm:size-20" />
+              <span>LaunchAudit</span>
             </h1>
-            <p className="max-w-prose text-lg text-muted-foreground sm:text-xl">
-              Built your app with AI tools? LaunchAudit reads your code and
-              probes your live URL, then tells you plainly whether it is safe
-              to launch, and shows the proof for every problem it finds.
-            </p>
-            <div className="flex flex-wrap gap-3 pt-2">
+            <div className="flex flex-wrap gap-3">
               <ButtonLink href="/audits/new" size="lg">
                 Run an audit
               </ButtonLink>
@@ -68,12 +65,25 @@ export default function HomePage() {
                 View reports
               </ButtonLink>
             </div>
-            <p className="max-w-prose text-sm text-muted-foreground">
-              Your code is read, never executed. Live checks only start after
-              you verify that you own the domain.
-            </p>
           </div>
           <SampleReport className="lg:col-span-6 lg:col-start-7 xl:col-span-5 xl:col-start-8" />
+        </div>
+      </section>
+
+      <section aria-labelledby="about-title" className="border-b bg-muted/40">
+        <div className="container-page flex flex-col gap-3 py-10 sm:py-12">
+          <h2 id="about-title" className="sr-only">
+            What LaunchAudit does
+          </h2>
+          <p className="max-w-prose text-lg text-balance sm:text-xl">
+            Built your app with AI tools? LaunchAudit reads your code and
+            probes your live URL, then tells you plainly whether it is safe to
+            launch, and shows the proof for every problem it finds.
+          </p>
+          <p className="max-w-prose text-sm text-muted-foreground">
+            Your code is read, never executed. Live checks only start after you
+            verify that you own the domain.
+          </p>
         </div>
       </section>
 
