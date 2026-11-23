@@ -34,14 +34,11 @@ export const auditFormSchema = z
     const hasRepo = value.repoUrl.length > 0;
     const hasZip = value.zipFile !== null;
     if (!hasRepo && !hasZip) {
+      // One issue, on the first field: the message names both options, so
+      // showing it under both fields would read as a duplicate.
       ctx.addIssue({
         code: "custom",
         path: ["repoUrl"],
-        message: "Add a GitHub repo URL or upload a zip file.",
-      });
-      ctx.addIssue({
-        code: "custom",
-        path: ["zipFile"],
         message: "Add a GitHub repo URL or upload a zip file.",
       });
     }

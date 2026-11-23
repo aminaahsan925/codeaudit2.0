@@ -78,7 +78,9 @@ class Settings(BaseSettings):
     # Required on purpose: a missing ENVIRONMENT must not silently mean "development".
     environment: Environment
     database_url: SecretStr
-    cors_origins: CommaSeparatedList = Field(default_factory=lambda: ["http://localhost:3000"])
+    cors_origins: CommaSeparatedList = Field(
+        default_factory=lambda: ["http://localhost:3000", "http://127.0.0.1:3000"]
+    )
     max_request_bytes: int = Field(default=10_485_760, gt=0)
     api_auth_token: SecretStr | None = None
     log_level: LogLevel = "INFO"

@@ -65,7 +65,8 @@ describe("validateAuditForm", () => {
   it("requires a repo URL or a zip", () => {
     const errors = validateAuditForm(values({ projectName: "pocket-notes" }));
     expect(errors.repoUrl).toBe("Add a GitHub repo URL or upload a zip file.");
-    expect(errors.zipFile).toBe("Add a GitHub repo URL or upload a zip file.");
+    // Shown once, under the repo field: the message names both options.
+    expect(errors.zipFile).toBeUndefined();
   });
 
   it("rejects a non-GitHub repo URL", () => {

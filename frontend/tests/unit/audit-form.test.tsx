@@ -54,8 +54,8 @@ describe("AuditForm", () => {
 
     expect(screen.getByText("Enter a project name.")).toBeVisible();
     expect(
-      screen.getAllByText("Add a GitHub repo URL or upload a zip file."),
-    ).toHaveLength(2);
+      screen.getByText("Add a GitHub repo URL or upload a zip file."),
+    ).toBeVisible();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

@@ -107,12 +107,22 @@ export function formatRiskScore(score: number): string {
 /**
  * Plain-language reading of a rerun score change (current minus previous,
  * so negative is an improvement). Null when there is no previous run.
+ * When both scores are given, the pair is shown too ("8.3 to 5.3"), so a
+ * reader can see where the score came from, not just how far it moved.
  */
-export function scoreChangeLabel(scoreChange: number | null): string | null {
+export function scoreChangeLabel(
+  scoreChange: number | null,
+  previousScore?: number | null,
+  currentScore?: number | null,
+): string | null {
   if (scoreChange === null) return null;
   if (scoreChange === 0) return "Risk score unchanged since the last run.";
   const magnitude = formatRiskScore(Math.abs(scoreChange));
-  return scoreChange < 0
-    ? `Risk score down ${magnitude} since the last run.`
-    : `Risk score up ${magnitude} since the last run.`;
+  const base =
+    scoreChange < 0
+      ? `Risk score down ${magnitude} since the last run.`
+      : `Risk score up ${magnitude} since the last run.`;
+  if (previousScore == null || currentScore == null) return base;
+  const pair = `${formatRiskScore(previousScore)} to ${formatRiskScore(currentScore)}`;
+  return `${base.slice(0, -1)} (${pair}).`;
 }

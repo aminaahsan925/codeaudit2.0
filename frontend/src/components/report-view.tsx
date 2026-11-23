@@ -24,10 +24,21 @@ import { cn } from "@/lib/utils";
  * journey steps, and the rerun comparison when this run reran an earlier one.
  */
 export function ReportView({ report }: { report: Report }) {
-  const { run, findings, counts, journey_steps, resolved_findings, score_change } =
-    report;
+  const {
+    run,
+    findings,
+    counts,
+    journey_steps,
+    resolved_findings,
+    score_change,
+    previous_risk_score,
+  } = report;
   const pdfUrl = reportPdfUrl(run.id, run.share_token);
-  const changeLabel = scoreChangeLabel(score_change);
+  const changeLabel = scoreChangeLabel(
+    score_change,
+    previous_risk_score,
+    run.risk_score,
+  );
   const isRerun = run.previous_run_id !== null;
   const runDate = formatDateTime(run.finished_at ?? run.started_at);
 

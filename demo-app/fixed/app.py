@@ -39,7 +39,12 @@ async def security_headers(request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
-    response.headers["Content-Security-Policy"] = "default-src 'self'"
+    # The templates style themselves with one inline <style> block, so
+    # style-src allows 'unsafe-inline'; scripts stay blocked (no inline
+    # scripts anywhere) and everything else must come from this origin.
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; style-src 'self' 'unsafe-inline'"
+    )
     return response
 
 
