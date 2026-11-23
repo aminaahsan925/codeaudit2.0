@@ -54,7 +54,7 @@ when a decision changes (say what replaced it and why).
   messages. Malformed JSON is `400 bad_request`; validation failures are
   `422 validation_error` and never echo submitted values.
 - **Security middleware**: pure-ASGI security headers and request-size limit
-  (default 1 MiB, enforced on Content-Length and on streamed bodies). The
+  (default 10 MiB, enforced on Content-Length and on streamed bodies). The
   built-in FastAPI size limit is not used because it answers in plain text.
   CORS is a thin subclass of Starlette's middleware so rejected preflights also
   use the error format. Order, outermost first: security headers, CORS, size
@@ -185,6 +185,54 @@ All feature work landed on the local integration branch
   `.gitleaks.toml`; it is a fake demo key, never a real credential.
 - **Native engine**: the built-in scan rules use engine `native`, distinct
   from `semgrep`/`gitleaks`/`osv` tool findings.
+
+## Security review fixes (Nov 2026)
+
+A read-only security review of the Launchpad build found four issues, fixed
+before the demo:
+
+- **Journey SSRF**: the journey runner used to classify only literal IPs,
+  so a hostname resolving to a private or metadata address passed the
+  guard. The base URL is now validated with the live client's
+  DNS-resolving `assert_url_allowed` (metadata always blocked), and every
+  request the browser makes is re-checked through Playwright request
+  routing, so redirects and form actions cannot steer the browser at a
+  private address either.
+- **Journey needs verification**: the journey used to run against any URL
+  with no ownership check, so the server would sign up, log in, and click
+  Pay on third-party sites. Live checks and the journey now share one
+  verification outcome: unverified domains are skipped by both.
+- **Artifacts are screenshots only**: the artifact endpoint used to serve
+  any file in the run directory, including the uploaded source zip, which
+  defeated secret masking. It now serves only `step-*.png` screenshots;
+  the zip stays server-side for reruns.
+- **Masking covers connection strings and bare tokens**: `mask_text`
+  (both the scan and live copies) now masks the userinfo of any
+  `scheme://...@` connection string regardless of variable name, and any
+  bare token-like run of 40+ characters, so an exposed `.env` excerpt
+  cannot redistribute live credentials.
+- **Live responses are capped**: the SSRF-safe client streams responses
+  and reads at most 5 MB, so a malicious target cannot exhaust server
+  memory with a huge body.
+
+## Known risks (accepted for the judges-only demo)
+
+- **DNS-rebinding TOCTOU (live client)**: validation resolves the hostname
+  and checks every answer, but the subsequent request resolves it again
+  independently, so an attacker domain with TTL 0 could pass validation
+  with a public answer and then connect to a private address. The proper
+  fix is IP pinning (connect to the validated address with the original
+  Host header and TLS SNI). Accepted for a judges-only demo with
+  semi-trusted guests; before any open public demo, either pin the
+  validated IP or put the backend behind an egress proxy that only
+  permits public destinations.
+- **Guest reruns are public by run id**: anyone who learns a run id can
+  rerun it and flip the original run's finding statuses. Documented
+  behavior for the demo; when real auth lands, reruns must check the
+  run's owner (or require the share token for guest runs).
+- **No retention sweep**: uploaded zips and screenshots are kept
+  indefinitely under `artifact_dir`. Add a retention job before a
+  long-running deployment.
 
 ## Tooling
 
