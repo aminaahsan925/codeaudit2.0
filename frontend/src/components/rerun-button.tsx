@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useRerunRun } from "@/hooks/use-run";
-import type { RerunRequest } from "@/lib/api";
+import { isApiError, type RerunRequest } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const inputClasses =
@@ -34,8 +34,10 @@ export function RerunButton({
   const [password, setPassword] = useState("");
   const [domainToken, setDomainToken] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
-  function start() {
+  async function start() {
     const trimmedEmail = email.trim();
     const hasEmail = trimmedEmail.length > 0;
     const hasPassword = password.length > 0;
@@ -53,20 +55,32 @@ export function RerunButton({
       payload.journey_email !== null ||
       payload.journey_password !== null ||
       payload.domain_token !== null;
-    rerun.mutate(
-      { runId, payload: hasPayload ? payload : undefined },
-      {
-        onSuccess: (newRun) => router.push(`/audits/${newRun.id}`),
-      },
-    );
+    // Await the mutation: per-call onSuccess is dropped when the observer
+    // loses its listeners (e.g. a remount mid-request), which would
+    // silently swallow the navigation.
+    setApiError(null);
+    setStarting(true);
+    try {
+      const newRun = await rerun.mutateAsync({
+        runId,
+        payload: hasPayload ? payload : undefined,
+      });
+      router.push(`/audits/${newRun.id}`);
+    } catch (error) {
+      setApiError(
+        isApiError(error) ? error.message : "The rerun could not start. Try again.",
+      );
+    } finally {
+      setStarting(false);
+    }
   }
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" onClick={start} disabled={rerun.isPending}>
+        <Button type="button" onClick={() => void start()} disabled={starting}>
           <RotateCcw aria-hidden="true" className="size-4" />
-          {rerun.isPending ? "Starting rerun…" : "Rerun audit"}
+          {starting ? "Starting rerun…" : "Rerun audit"}
         </Button>
         <button
           type="button"
@@ -132,9 +146,9 @@ export function RerunButton({
           {formError}
         </p>
       ) : null}
-      {rerun.isError ? (
+      {apiError ? (
         <p role="alert" className="max-w-prose text-sm text-sev-critical-fg">
-          The rerun could not start: {rerun.error.message}
+          The rerun could not start: {apiError}
         </p>
       ) : null}
     </div>

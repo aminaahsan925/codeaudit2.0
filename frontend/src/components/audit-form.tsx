@@ -6,7 +6,7 @@ import { useState, type ChangeEvent, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useCreateRun } from "@/hooks/use-run";
-import type { CreateRunInput } from "@/lib/api";
+import { isApiError, type CreateRunInput } from "@/lib/api";
 import {
   EMPTY_AUDIT_FORM,
   validateAuditForm,
@@ -46,6 +46,8 @@ export function AuditForm() {
   const [values, setValues] = useState<AuditFormValues>(EMPTY_AUDIT_FORM);
   const [errors, setErrors] = useState<AuditFormErrors>({});
   const [attempted, setAttempted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   function setValue<K extends keyof AuditFormValues>(
     key: K,
@@ -61,7 +63,7 @@ export function AuditForm() {
     setValue("zipFile", file);
   }
 
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextErrors = validateAuditForm(values);
     setErrors(nextErrors);
@@ -77,12 +79,23 @@ export function AuditForm() {
       journeyPassword: values.journeyPassword || undefined,
       domainToken: values.domainToken || undefined,
     };
-    createRun.mutate(input, {
-      onSuccess: (run) => router.push(`/audits/${run.id}`),
-    });
+    // Await the mutation instead of relying on a per-call onSuccess:
+    // TanStack Query drops per-call callbacks when the observer loses its
+    // listeners (e.g. the component remounts mid-request), which silently
+    // swallowed the navigation. The awaited promise settles either way.
+    setApiError(null);
+    setSubmitting(true);
+    try {
+      const run = await createRun.mutateAsync(input);
+      router.push(`/audits/${run.id}`);
+    } catch (error) {
+      setApiError(
+        isApiError(error) ? error.message : "The audit could not start. Try again.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
-
-  const submitting = createRun.isPending;
 
   return (
     <form onSubmit={onSubmit} noValidate className="flex max-w-prose flex-col gap-8">
@@ -268,10 +281,10 @@ export function AuditForm() {
         </div>
       </section>
 
-      {createRun.isError ? (
+      {apiError ? (
         <p role="alert" className="flex items-start gap-2 text-sm text-sev-critical-fg">
           <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-          <span>The audit could not start: {createRun.error.message}</span>
+          <span>The audit could not start: {apiError}</span>
         </p>
       ) : null}
 
