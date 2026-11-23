@@ -40,6 +40,8 @@ class AuditRun(BaseModel):
     error: str | None = None
     share_token: str | None = None
     is_guest: bool = False
+    previous_run_id: UUID | None = None
+    domain_verified: bool = False
 
     @field_validator("risk_score")
     @classmethod
