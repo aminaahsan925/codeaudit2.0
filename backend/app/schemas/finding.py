@@ -14,6 +14,7 @@ _RESPONSE_CONFIG = ConfigDict(json_schema_serialization_defaults_required=True)
 
 
 class FindingEngine(StrEnum):
+    NATIVE = "native"
     SEMGREP = "semgrep"
     GITLEAKS = "gitleaks"
     OSV = "osv"
