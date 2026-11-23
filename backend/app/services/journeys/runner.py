@@ -7,11 +7,16 @@ no findings. A passed journey produces no findings.
 
 The browser is launched with the proxy disabled so localhost targets work
 on machines with a proxy configured. Credentials are never logged.
+
+The target gets the same SSRF protection as the live checks: the base URL
+is validated with the live client's DNS-resolving check before the browser
+launches, and every request the browser makes (including redirects) is
+checked again through request routing, so a page can never steer the
+browser at a private or metadata address.
 """
 
 from __future__ import annotations
 
-import ipaddress
 import time
 from contextlib import suppress
 from pathlib import Path
@@ -19,8 +24,11 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 from playwright.sync_api import (
+    Browser,
     Page,
     Playwright,
+    Request,
+    Route,
     sync_playwright,
 )
 from playwright.sync_api import (
@@ -35,6 +43,11 @@ from app.schemas.finding import (
     FindingCategory,
     FindingEngine,
     Severity,
+)
+from app.services.live.ssrf_client import (
+    SsrfBlockedError,
+    assert_url_allowed,
+    loopback_allowed,
 )
 
 from .models import (
@@ -66,40 +79,60 @@ class StepFailedError(Exception):
     """Raised when a journey step cannot complete."""
 
 
-def _is_loopback_or_private(hostname: str) -> bool:
-    """True for localhost, .local names, and loopback/private/link-local IPs."""
-    host = hostname.strip().lower().rstrip(".")
-    if host == "localhost" or host.endswith((".localhost", ".local")):
-        return True
-    try:
-        address = ipaddress.ip_address(host)
-    except ValueError:
-        # A public hostname: only literal addresses and local names are
-        # classified here, no DNS lookup is performed.
-        return False
-    return (
-        address.is_loopback
-        or address.is_private
-        or address.is_link_local
-        or address.is_reserved
-        or address.is_multicast
-    )
-
-
 def _check_target_allowed(base_url: str, settings: Settings) -> None:
-    """Loopback/private targets need the explicit opt-in, never in production."""
-    hostname = urlparse(base_url).hostname
-    if hostname is None:
-        raise JourneyTargetBlockedError(f"Journey target {base_url!r} has no hostname.")
-    if not _is_loopback_or_private(hostname):
-        return
-    if settings.allow_loopback_live_checks and settings.environment != "production":
-        return
-    raise JourneyTargetBlockedError(
-        f"Journey target {base_url} is a loopback or private address. "
-        "Loopback and private targets are allowed only when "
-        "allow_loopback_live_checks is enabled and the environment is not production."
-    )
+    """The journey target must pass the same SSRF check as live checks.
+
+    The hostname is resolved and every address must be public, unless
+    loopback targets are explicitly allowed outside production. Cloud
+    metadata addresses are always blocked, even in loopback mode.
+    """
+    try:
+        assert_url_allowed(base_url, allow_loopback=loopback_allowed(settings))
+    except SsrfBlockedError as exc:
+        raise JourneyTargetBlockedError(f"Journey target {base_url} is not allowed: {exc}") from exc
+
+
+def _is_request_allowed(url: str, *, allow_loopback: bool, cache: dict[str, bool]) -> bool:
+    """Whether the browser may fetch this URL (checked per host, cached).
+
+    Only http(s) URLs whose host passes the SSRF check are allowed. The
+    cache keeps one DNS lookup per host for the whole journey.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return False
+    host = (parsed.hostname or "").lower()
+    if not host:
+        return False
+    if host not in cache:
+        try:
+            assert_url_allowed(url, allow_loopback=allow_loopback)
+            cache[host] = True
+        except SsrfBlockedError:
+            cache[host] = False
+    return cache[host]
+
+
+def _guarded_page(browser: Browser, settings: Settings) -> Page:
+    """A page whose every request is SSRF-checked before it is sent.
+
+    Without this, a redirect or a form action on the target could steer
+    the browser at a private or metadata address after the base URL
+    itself passed validation. Blocked requests are aborted, which fails
+    the current step (a finding) instead of fetching the address.
+    """
+    page = browser.new_page()
+    allow_loopback = loopback_allowed(settings)
+    cache: dict[str, bool] = {}
+
+    def _on_route(route: Route, request: Request) -> None:
+        if _is_request_allowed(request.url, allow_loopback=allow_loopback, cache=cache):
+            route.continue_()
+        else:
+            route.abort()
+
+    page.route("**/*", _on_route)
+    return page
 
 
 def _launch(p: Playwright):
@@ -469,7 +502,7 @@ def run_journey(
     with sync_playwright() as p:
         browser = _launch(p)
         try:
-            page = browser.new_page()
+            page = _guarded_page(browser, settings)
             for index, (name, filename, fn) in enumerate(
                 zip(STEP_NAMES, STEP_SCREENSHOTS, step_fns, strict=True)
             ):

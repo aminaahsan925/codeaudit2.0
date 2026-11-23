@@ -364,6 +364,34 @@ def test_unverified_domain_skips_live_checks(
     assert all(finding.engine.value != "live" for finding in findings)
 
 
+def test_unverified_domain_skips_journey(
+    session_factory: Callable[[], Session],
+    run_settings: Settings,
+    tmp_path: Path,
+) -> None:
+    # A public host with no domain token and journey credentials: the
+    # journey is skipped too, so the server never signs up, logs in, or
+    # clicks Pay on a site the submitter has not proven they own.
+    run = _create_run(session_factory, live_url="https://example.com")
+
+    execute_run(
+        run.id,
+        run_settings,
+        session_factory=session_factory,
+        upload_path=_zip_demo_tree("broken", tmp_path / "broken.zip"),
+        journey_email=_fresh_email(),
+        journey_password=TEST_PASSWORD,
+    )
+
+    finished = _get_run(session_factory, run.id)
+    assert finished is not None
+    assert finished.status == AuditRunStatus.SUCCEEDED
+    assert finished.risk_score == 4.3
+    assert _get_journey_steps(session_factory, run.id) is None
+    findings = _get_findings(session_factory, run.id)
+    assert all(finding.engine.value != "journey" for finding in findings)
+
+
 # ---------------------------------------------------------------- failures
 
 

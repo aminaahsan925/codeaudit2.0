@@ -192,29 +192,77 @@ def test_loopback_blocked_in_production_even_when_enabled(settings_factory, tmp_
         )
 
 
-def test_public_target_passes_the_guard(settings_factory, tmp_path: Path) -> None:
+def test_public_target_passes_the_guard(settings_factory, tmp_path: Path, monkeypatch) -> None:
     """The guard only blocks loopback/private targets, not public ones.
 
     No browser is launched here: the guard is checked directly, since a
-    real public shop is out of scope for this test run.
+    real public shop is out of scope for this test run. DNS is stubbed so
+    the test never touches the network.
     """
     from app.services.journeys.runner import _check_target_allowed
 
+    monkeypatch.setattr(
+        "app.services.live.ssrf_client.resolve_host",
+        lambda host, port: ["93.184.216.34"],
+    )
     settings: Settings = settings_factory(allow_loopback_live_checks=False)
     _check_target_allowed("https://example.com", settings)
     _check_target_allowed("https://shop.example.org:8443/store", settings)
 
 
-def test_loopback_variants_are_blocked(settings_factory) -> None:
-    from app.services.journeys.runner import _is_loopback_or_private
+def test_hostname_resolving_to_private_ip_is_blocked(settings_factory, monkeypatch) -> None:
+    """A hostname is judged by what it resolves to, not by its spelling."""
+    from app.services.journeys.runner import _check_target_allowed
 
-    assert _is_loopback_or_private("localhost") is True
-    assert _is_loopback_or_private("127.0.0.1") is True
-    assert _is_loopback_or_private("10.0.0.5") is True
-    assert _is_loopback_or_private("192.168.1.20") is True
-    assert _is_loopback_or_private("172.16.0.9") is True
-    assert _is_loopback_or_private("::1") is True
-    assert _is_loopback_or_private("169.254.169.254") is True
-    assert _is_loopback_or_private("printer.local") is True
-    assert _is_loopback_or_private("example.com") is False
-    assert _is_loopback_or_private("8.8.8.8") is False
+    monkeypatch.setattr(
+        "app.services.live.ssrf_client.resolve_host",
+        lambda host, port: ["10.0.0.5"],
+    )
+    settings: Settings = settings_factory(allow_loopback_live_checks=False)
+    with pytest.raises(JourneyTargetBlockedError):
+        _check_target_allowed("https://shop.example.com", settings)
+
+
+def test_metadata_blocked_even_with_loopback_allowed(settings_factory) -> None:
+    """The cloud metadata address stays blocked in loopback demo mode."""
+    from app.services.journeys.runner import _check_target_allowed
+
+    settings: Settings = settings_factory(allow_loopback_live_checks=True)
+    with pytest.raises(JourneyTargetBlockedError, match="metadata"):
+        _check_target_allowed("http://169.254.169.254/latest/meta-data/", settings)
+
+
+def test_loopback_variants_are_blocked(settings_factory) -> None:
+    from app.services.journeys.runner import _check_target_allowed
+
+    settings: Settings = settings_factory(allow_loopback_live_checks=False)
+    for url in (
+        "http://localhost:8001",
+        "http://127.0.0.1:8001",
+        "http://10.0.0.5/",
+        "http://192.168.1.20/",
+        "http://172.16.0.9/",
+        "http://[::1]/",
+        "http://169.254.169.254/",
+    ):
+        with pytest.raises(JourneyTargetBlockedError):
+            _check_target_allowed(url, settings)
+
+
+def test_request_guard_allows_public_blocks_private(settings_factory, monkeypatch) -> None:
+    """The per-request browser guard: public hosts pass, private ones abort."""
+    from app.services.journeys.runner import _is_request_allowed
+
+    def fake_resolve(host: str, port: int) -> list[str]:
+        return {"internal.example.com": ["192.168.1.9"]}.get(host, ["93.184.216.34"])
+
+    monkeypatch.setattr("app.services.live.ssrf_client.resolve_host", fake_resolve)
+    cache: dict[str, bool] = {}
+    assert _is_request_allowed("https://example.com/app.js", allow_loopback=False, cache=cache)
+    assert not _is_request_allowed(
+        "https://internal.example.com/x.png", allow_loopback=False, cache=cache
+    )
+    assert not _is_request_allowed("http://169.254.169.254/", allow_loopback=True, cache=cache)
+    assert not _is_request_allowed("file:///etc/passwd", allow_loopback=False, cache=cache)
+    assert _is_request_allowed("http://127.0.0.1:8001/", allow_loopback=True, cache=cache)
+    assert not _is_request_allowed("http://127.0.0.1:8001/", allow_loopback=False, cache={})

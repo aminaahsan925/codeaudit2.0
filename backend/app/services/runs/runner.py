@@ -123,23 +123,22 @@ def _fetch_code(run: AuditRun, upload_path: Path | None, tmp_path: Path) -> Path
     raise CodeInputError("No code was provided for this run.")
 
 
-def _live_stage(
+def _verify_live_domain(
     run: AuditRun,
     settings: Settings,
     session_factory: SessionFactory | None,
-    journey_email: str | None,
-    journey_password: str | None,
     domain_token: str | None,
-) -> list[Finding]:
-    """Live checks, or an empty list when they cannot run.
+) -> bool:
+    """Whether the run's live URL may be probed.
 
-    Live checks run only on a verified domain. A loopback or private
-    target counts as verified when loopback checks are enabled outside
-    production; otherwise the domain token must verify. An unverified
-    domain is skipped, never probed.
+    A loopback or private target counts as verified when loopback checks
+    are enabled outside production; otherwise the domain token must
+    verify. The run row is marked verified when the check passes. Both
+    live checks and the journey use this one outcome: an unverified
+    domain is never probed and never driven in a browser.
     """
     if run.live_url is None:
-        return []
+        return False
     live_url = str(run.live_url)
     host = urlparse(live_url).hostname or ""
     verified = False
@@ -148,10 +147,30 @@ def _live_stage(
         logger.info("Run %s: live target is local, treated as verified.", run.id)
     elif domain_token:
         verified = verify_domain(live_url, domain_token, settings)
+    if verified:
+        _update_domain_verified(session_factory, run.id)
+    return verified
+
+
+def _live_stage(
+    run: AuditRun,
+    settings: Settings,
+    session_factory: SessionFactory | None,
+    journey_email: str | None,
+    journey_password: str | None,
+    verified: bool,
+) -> list[Finding]:
+    """Live checks, or an empty list when they cannot run.
+
+    Live checks run only on a verified domain. An unverified domain is
+    skipped, never probed.
+    """
+    if run.live_url is None:
+        return []
     if not verified:
         logger.info("Run %s: live checks skipped (%s).", run.id, SKIPPED_NOT_VERIFIED)
         return []
-    _update_domain_verified(session_factory, run.id)
+    live_url = str(run.live_url)
     try:
         result = run_live_checks_detailed(live_url, settings, True, journey_email, journey_password)
     except Exception:  # a failed live stage never fails the audit
@@ -174,15 +193,20 @@ def _journey_stage(
     session_factory: SessionFactory | None,
     journey_email: str | None,
     journey_password: str | None,
+    verified: bool,
 ) -> list[Finding]:
     """Journey run, or an empty list when it cannot run.
 
-    The journey needs a live URL and credentials. Its steps are stored on
-    the run, and finding screenshot names are prefixed with the run's
-    artifact URL.
+    The journey needs a live URL, credentials, and a verified domain:
+    the server never signs up, logs in, or clicks Pay on a site the
+    submitter has not proven they own. Its steps are stored on the run,
+    and finding screenshot names are prefixed with the run's artifact URL.
     """
     if run.live_url is None or not journey_email or not journey_password:
         logger.info("Run %s: journey skipped (no live URL or no credentials).", run.id)
+        return []
+    if not verified:
+        logger.info("Run %s: journey skipped (%s).", run.id, SKIPPED_NOT_VERIFIED)
         return []
     artifact_dir = settings.artifact_dir / str(run.id)
     try:
@@ -301,12 +325,13 @@ def _run_pipeline(
         _update_status(session_factory, run_id, progress=15)
         code_findings = run_code_scan(tree).findings
         _update_status(session_factory, run_id, progress=40)
+        verified = _verify_live_domain(run, settings, session_factory, domain_token)
         live_findings = _live_stage(
-            run, settings, session_factory, journey_email, journey_password, domain_token
+            run, settings, session_factory, journey_email, journey_password, verified
         )
         _update_status(session_factory, run_id, progress=60)
         journey_findings = _journey_stage(
-            run, settings, session_factory, journey_email, journey_password
+            run, settings, session_factory, journey_email, journey_password, verified
         )
         _update_status(session_factory, run_id, progress=80)
         findings = dedupe_findings(code_findings + live_findings + journey_findings)
