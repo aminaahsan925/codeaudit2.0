@@ -10,7 +10,7 @@ the same PR that changes it.
 | 2 | Code scanner with evidence | Semgrep, gitleaks and OSV scans normalised into Findings with file, line, snippet and data-flow trace | Not started |
 | 3 | Vibe-coding checks | Supabase RLS, exposed keys, open Firebase rules, unauthenticated routes | Not started |
 | 4 | Live app security checks | Header, TLS, exposure and auth checks against the live URL, only after domain ownership verification, through an SSRF-safe client | Not started |
-| 5 | Journey runner | Scripted user journeys against the live app with screenshots as evidence | Not started |
+| 5 | Journey runner | Scripted user journeys against the live app with screenshots as evidence | Done |
 | 6 | Verdict and risk score | Launch / Fix first / Do not launch verdict and a 0-10 risk score derived from findings | Not started |
 | 7 | Fix-first list | Ordered list of the findings to fix before launch | Not started |
 | 8 | Review and fix suggestions | LLM review (Gemini, Groq fallback, rule-based fallback) that confirms findings and proposes fixes; every claim must quote code | Not started |
