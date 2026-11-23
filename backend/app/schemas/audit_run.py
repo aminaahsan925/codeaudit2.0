@@ -42,8 +42,9 @@ class AuditRun(BaseModel):
     share_token: str | None = None
     is_guest: bool = False
     # Journey steps as stored JSON dicts (name, status, screenshot, error).
-    # The matching ORM column lands on the audit-run branch; None until then.
     journey_steps: list[dict[str, Any]] | None = None
+    previous_run_id: UUID | None = None
+    domain_verified: bool = False
 
     @field_validator("risk_score")
     @classmethod

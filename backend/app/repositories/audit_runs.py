@@ -6,6 +6,7 @@ caller owns the transaction.
 """
 
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -37,6 +38,8 @@ def _model_to_schema(model: AuditRunModel) -> AuditRun:
         error=model.error,
         share_token=model.share_token,
         is_guest=model.is_guest,
+        previous_run_id=model.previous_run_id,
+        domain_verified=model.domain_verified,
     )
 
 
@@ -55,6 +58,8 @@ def _schema_to_model(run: AuditRun, owner: str | None) -> AuditRunModel:
         error=run.error,
         share_token=run.share_token,
         is_guest=run.is_guest,
+        previous_run_id=run.previous_run_id,
+        domain_verified=run.domain_verified,
         owner=owner,
     )
 
@@ -77,6 +82,50 @@ class AuditRunRepository(BaseRepository[AuditRunModel]):
         stmt = select(AuditRunModel).where(AuditRunModel.share_token == token)
         model = self.session.scalars(stmt).first()
         return _model_to_schema(model) if model is not None else None
+
+    def list_by_owner(self, owner: str, *, limit: int = 50) -> list[AuditRun]:
+        """Runs owned by `owner`, newest first (by start time).
+
+        Runs that never started have no start time and sort last.
+        """
+        limit = max(1, min(limit, 500))
+        stmt = (
+            select(AuditRunModel)
+            .where(AuditRunModel.owner == owner)
+            .order_by(AuditRunModel.started_at.desc().nulls_last())
+            .limit(limit)
+        )
+        return [_model_to_schema(model) for model in self.session.scalars(stmt).all()]
+
+    def get_journey_steps(self, run_id: UUID) -> list[dict[str, Any]] | None:
+        """The journey steps stored for a run, or None when no journey ran.
+
+        Journey steps are JSON on the row, not (yet) a field of the AuditRun
+        schema, so they round-trip through this reader and
+        `update_journey_steps` instead of `_model_to_schema`.
+        """
+        model = super().get(run_id)
+        if model is None:
+            return None
+        return model.journey_steps
+
+    def update_journey_steps(self, run_id: UUID, steps: list[dict[str, Any]]) -> AuditRun | None:
+        """Store the journey step list for a run. Returns None when missing."""
+        model = super().get(run_id)
+        if model is None:
+            return None
+        model.journey_steps = steps
+        self.session.flush()
+        return _model_to_schema(model)
+
+    def update_domain_verified(self, run_id: UUID, *, verified: bool = True) -> AuditRun | None:
+        """Record whether the run's live domain passed verification."""
+        model = super().get(run_id)
+        if model is None:
+            return None
+        model.domain_verified = verified
+        self.session.flush()
+        return _model_to_schema(model)
 
     def update_status(
         self,
