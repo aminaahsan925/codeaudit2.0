@@ -38,6 +38,8 @@ class AuditRun(BaseModel):
     started_at: AwareDatetime | None = None
     finished_at: AwareDatetime | None = None
     error: str | None = None
+    share_token: str | None = None
+    is_guest: bool = False
 
     @field_validator("risk_score")
     @classmethod
