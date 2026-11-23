@@ -4,6 +4,7 @@ Mirrors `docs/api-contract.md` (Domain schemas -> AuditRun).
 """
 
 from enum import StrEnum
+from typing import Any
 from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, HttpUrl, field_validator
@@ -40,6 +41,9 @@ class AuditRun(BaseModel):
     error: str | None = None
     share_token: str | None = None
     is_guest: bool = False
+    # Journey steps as stored JSON dicts (name, status, screenshot, error).
+    # The matching ORM column lands on the audit-run branch; None until then.
+    journey_steps: list[dict[str, Any]] | None = None
 
     @field_validator("risk_score")
     @classmethod
