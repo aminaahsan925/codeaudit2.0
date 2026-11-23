@@ -67,7 +67,7 @@ describe("ReportView", () => {
 
     expect(screen.getByText("Since the last run")).toBeVisible();
     expect(
-      screen.getByText("Risk score down 3.3 since the last run."),
+      screen.getByText("Risk score down 3.3 since the last run (4.3 to 1.0)."),
     ).toBeVisible();
     expect(screen.getByText(/1 finding resolved/)).toBeVisible();
     expect(
