@@ -1,0 +1,46 @@
+# Install once per clone: pre-commit install
+# Run everything manually: pre-commit run --all-files
+# Requires gitleaks, uv and pnpm on PATH (see README prerequisites).
+# Remote hooks are pinned to commit SHAs; update with `pre-commit autoupdate --freeze`.
+repos:
+  - repo: local
+    hooks:
+      # Uses the installed gitleaks binary on staged changes (the upstream
+      # golang hook compiles gitleaks from source on first run, which is slow).
+      - id: gitleaks
+        name: gitleaks (staged changes)
+        entry: gitleaks git --pre-commit --redact --staged --verbose
+        language: system
+        pass_filenames: false
+      - id: frontend-lint
+        name: frontend lint (eslint)
+        entry: pnpm --dir frontend lint
+        language: system
+        files: ^frontend/.*\.(ts|tsx|js|jsx|mjs|cjs)$
+        pass_filenames: false
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # frozen: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: check-merge-conflict
+      - id: check-yaml
+        exclude: ^frontend/pnpm-lock\.yaml$  # pnpm 12 lockfiles are multi-document
+      - id: check-json
+        exclude: ^frontend/tsconfig(\.build)?\.json$
+      - id: detect-private-key
+      - id: end-of-file-fixer
+        exclude: ^\.claude/skills/  # vendored skills, pinned in skills-lock.json
+      - id: trailing-whitespace
+        args: ["--markdown-linebreak-ext=md"]
+        exclude: ^\.claude/skills/
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 9026c9127e153371d7a78dfcb0c45ae2046a3d10 # frozen: v0.17.6
+    hooks:
+      - id: ruff-check
+        args: ["--fix"]
+        files: ^backend/
+      - id: ruff-format
+        files: ^backend/
