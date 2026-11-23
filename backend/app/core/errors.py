@@ -32,6 +32,7 @@ STATUS_TO_CODE: Final[Mapping[int, ErrorCode]] = {
     405: ErrorCode.METHOD_NOT_ALLOWED,
     413: ErrorCode.PAYLOAD_TOO_LARGE,
     422: ErrorCode.VALIDATION_ERROR,
+    429: ErrorCode.RATE_LIMITED,
     500: ErrorCode.INTERNAL_ERROR,
 }
 
@@ -43,6 +44,7 @@ DEFAULT_MESSAGES: Final[Mapping[ErrorCode, str]] = {
     ErrorCode.METHOD_NOT_ALLOWED: "Method not allowed for this resource.",
     ErrorCode.PAYLOAD_TOO_LARGE: "Request body is too large.",
     ErrorCode.VALIDATION_ERROR: "The request failed validation.",
+    ErrorCode.RATE_LIMITED: "Too many audit runs. Try again later.",
     ErrorCode.INTERNAL_ERROR: "An unexpected error occurred.",
 }
 
@@ -85,6 +87,11 @@ class ForbiddenError(AppError):
 class NotFoundError(AppError):
     status_code = 404
     code = ErrorCode.NOT_FOUND
+
+
+class RateLimitedError(AppError):
+    status_code = 429
+    code = ErrorCode.RATE_LIMITED
 
 
 def error_body(code: ErrorCode, message: str) -> dict[str, dict[str, str]]:

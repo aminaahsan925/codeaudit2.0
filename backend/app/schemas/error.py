@@ -13,6 +13,7 @@ class ErrorCode(StrEnum):
     METHOD_NOT_ALLOWED = "method_not_allowed"
     PAYLOAD_TOO_LARGE = "payload_too_large"
     VALIDATION_ERROR = "validation_error"
+    RATE_LIMITED = "rate_limited"
     INTERNAL_ERROR = "internal_error"
 
 
