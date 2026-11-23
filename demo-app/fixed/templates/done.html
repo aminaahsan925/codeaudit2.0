@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Order placed</h1>
+<div class="note">Thanks for your order.</div>
+{% if order %}
+<p>Order id: {{ order["id"] }}</p>
+<p>Total: ${{ "%.2f"|format(order["total"]) }}</p>
+{% else %}
+<p>We could not find that order.</p>
+{% endif %}
+<a class="btn" href="/">Continue shopping</a>
+{% endblock %}
