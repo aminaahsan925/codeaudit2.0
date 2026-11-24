@@ -253,6 +253,20 @@ def test_pip_audit_fallback_when_osv_missing(tmp_path, fake_tools) -> None:
     assert reasons["osv-scanner"] == "osv-scanner is not installed"
 
 
+def test_pip_audit_runs_with_no_deps_and_disable_pip(tmp_path, fake_tools) -> None:
+    (tmp_path / "requirements.txt").write_text("jinja2==3.1.5\n")
+    fake_run = fake_tools(
+        {"pip-audit": _completed(json.dumps({"dependencies": []}))},
+        installed={"pip-audit"},
+    )
+    run_external_tools(tmp_path, [])
+    commands = [c for c in fake_run.commands if Path(c[0]).name == "pip-audit"]
+    assert len(commands) == 1
+    # pip-audit must never install or resolve the scanned project's packages.
+    assert "--no-deps" in commands[0]
+    assert "--disable-pip" in commands[0]
+
+
 def test_cve_tools_skipped_without_manifests(tmp_path, fake_tools) -> None:
     fake_tools({}, installed={"osv-scanner", "pip-audit"})
     _, _, skipped = run_external_tools(tmp_path, [])
