@@ -11,6 +11,7 @@ from the client.
 
 from __future__ import annotations
 
+import hmac
 import re
 import secrets
 import shutil
@@ -24,6 +25,7 @@ from fastapi import (
     Depends,
     File,
     Form,
+    Query,
     Request,
     UploadFile,
 )
@@ -38,7 +40,8 @@ from app.api.deps import (
     SettingsDep,
     bearer_scheme,
 )
-from app.core.errors import AppError, NotFoundError, UnauthorizedError
+from app.api.run_access import require_run_owner
+from app.core.errors import AppError, NotFoundError
 from app.core.ratelimit import enforce_audit_rate_limit
 from app.repositories.audit_runs import AuditRunRepository
 from app.schemas.audit_run import AuditRun
@@ -153,11 +156,13 @@ def list_runs(principal: CurrentPrincipal, session: DbSession) -> list[AuditRun]
     return AuditRunRepository(session).list_by_owner(principal.subject)
 
 
-@router.get("/{run_id}", summary="Get an audit run", responses=error_responses(404))
-def get_run(run_id: UUID, session: DbSession) -> AuditRun:
-    run = AuditRunRepository(session).get(run_id)
+@router.get("/{run_id}", summary="Get an audit run", responses=error_responses(401, 404))
+def get_run(run_id: UUID, session: DbSession, principal: OptionalPrincipal) -> AuditRun:
+    repository = AuditRunRepository(session)
+    run = repository.get(run_id)
     if run is None:
         raise NotFoundError("Audit run not found.")
+    require_run_owner(run, repository.get_owner(run_id), principal)
     return run
 
 
@@ -177,11 +182,11 @@ async def rerun_run(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
     payload: RerunRequest | None = None,
 ) -> AuditRun:
-    original = AuditRunRepository(session).get(run_id)
+    repository = AuditRunRepository(session)
+    original = repository.get(run_id)
     if original is None:
         raise NotFoundError("Audit run not found.")
-    if not original.is_guest and principal is None:
-        raise UnauthorizedError("Missing or invalid bearer token.")
+    require_run_owner(original, repository.get_owner(run_id), principal)
     rerun = payload or RerunRequest()
     _check_journey_credentials(rerun.journey_email, rerun.journey_password)
     enforce_audit_rate_limit(request, settings, _rate_limit_token(principal, credentials))
@@ -199,7 +204,7 @@ async def rerun_run(
         journey_definition=original.journey_definition,
     )
     owner = principal.subject if principal is not None and not original.is_guest else None
-    created = AuditRunRepository(session).create(new_run, owner=owner)
+    created = repository.create(new_run, owner=owner)
 
     upload_path: Path | None = None
     if original.repo_url is None:
@@ -229,9 +234,35 @@ async def rerun_run(
 @router.get(
     "/{run_id}/artifacts/{name}",
     summary="Get a run artifact",
-    responses=error_responses(404),
+    responses=error_responses(401, 404),
 )
-def get_artifact(run_id: UUID, name: str, settings: SettingsDep) -> FileResponse:
+def get_artifact(
+    run_id: UUID,
+    name: str,
+    session: DbSession,
+    settings: SettingsDep,
+    principal: OptionalPrincipal,
+    token: Annotated[str | None, Query(description="Share token for public access")] = None,
+) -> FileResponse:
+    repository = AuditRunRepository(session)
+    run = repository.get(run_id)
+    if run is None:
+        raise NotFoundError("Artifact not found.")
+    # A valid share token opens the artifact without a login, so the public
+    # shared report page can show journey screenshots. Otherwise the owner
+    # rule applies (guest runs stay open, owned runs need their owner).
+    share_ok = (
+        token is not None
+        and run.share_token is not None
+        and hmac.compare_digest(token, run.share_token)
+    )
+    if not share_ok:
+        require_run_owner(
+            run,
+            repository.get_owner(run_id),
+            principal,
+            not_found_message="Artifact not found.",
+        )
     run_dir = settings.artifact_dir / str(run_id)
     if not name or "/" in name or "\\" in name or name in (".", ".."):
         raise NotFoundError("Artifact not found.")

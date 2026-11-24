@@ -91,6 +91,15 @@ class AuditRunRepository(BaseRepository[AuditRunModel]):
         model = self.session.scalars(stmt).first()
         return _model_to_schema(model) if model is not None else None
 
+    def get_owner(self, run_id: UUID) -> str | None:
+        """The owning user id for a run, or None when the run is missing or
+        has no owner recorded (guest runs, and runs created before owners
+        were tracked)."""
+        model = super().get(run_id)
+        if model is None:
+            return None
+        return model.owner
+
     def list_by_owner(self, owner: str, *, limit: int = 50) -> list[AuditRun]:
         """Runs owned by `owner`, newest first (by start time).
 

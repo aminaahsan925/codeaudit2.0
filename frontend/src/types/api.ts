@@ -1136,6 +1136,15 @@ export interface operations {
                     "application/json": components["schemas"]["AuditRun"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -1158,7 +1167,10 @@ export interface operations {
     };
     get_artifact_api_runs__run_id__artifacts__name__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Share token for public access */
+                token?: string | null;
+            };
             header?: never;
             path: {
                 run_id: string;
@@ -1175,6 +1187,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Not Found */
@@ -1278,6 +1299,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReportResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Not Found */

@@ -124,8 +124,10 @@ def make_finding(**overrides: Any) -> Finding:
     return Finding(**values)
 
 
-def _seed_run_with_finding(session: Session, *, is_guest: bool = True) -> tuple[AuditRun, Finding]:
-    run = AuditRunRepository(session).create(make_run(is_guest=is_guest))
+def _seed_run_with_finding(
+    session: Session, *, is_guest: bool = True, owner: str | None = None
+) -> tuple[AuditRun, Finding]:
+    run = AuditRunRepository(session).create(make_run(is_guest=is_guest), owner=owner)
     finding = FindingRepository(session).create(run.id, make_finding())
     session.commit()
     return run, finding
@@ -357,7 +359,9 @@ def test_patch_owned_run_needs_auth(api_client: TestClient, db_session: Session)
 
 
 def test_patch_owned_run_with_token_succeeds(api_client: TestClient, db_session: Session) -> None:
-    run, finding = _seed_run_with_finding(db_session, is_guest=False)
+    # The dev token stub authenticates as principal "dev", so the run must
+    # be owned by "dev" for the owner check to pass.
+    run, finding = _seed_run_with_finding(db_session, is_guest=False, owner="dev")
 
     response = api_client.patch(
         f"/api/runs/{run.id}/findings/{finding.id}",

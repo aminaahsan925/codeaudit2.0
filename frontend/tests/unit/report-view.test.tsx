@@ -91,6 +91,25 @@ describe("ReportView", () => {
     expect(screen.getByText(/1\. Sign up/)).toBeVisible();
   });
 
+  it("appends the share token to journey screenshot URLs", () => {
+    renderWithQueryClient(
+      <ReportView
+        report={makeReport({
+          journey_steps: [
+            { name: "Sign up", status: "passed", screenshot_url: "signup.png", error: null },
+          ],
+        })}
+      />,
+    );
+    const expectedSrc =
+      `http://localhost:8000/api/runs/${RUN_ID}/artifacts/signup.png` +
+      `?${new URLSearchParams({ token: SHARE_TOKEN }).toString()}`;
+    expect(screen.getByAltText("Screenshot of the Sign up step")).toHaveAttribute(
+      "src",
+      expectedSrc,
+    );
+  });
+
   it("hides the PDF link without a share token", () => {
     renderWithQueryClient(
       <ReportView report={makeReport({ run: makeRun({ share_token: null }) })} />,

@@ -191,6 +191,7 @@ export function ReportView({
                 finding={finding}
                 index={index + 1}
                 runId={run.id}
+                shareToken={run.share_token ?? undefined}
                 readOnly={readOnly}
               />
             ))}
@@ -198,7 +199,11 @@ export function ReportView({
         )}
       </section>
 
-      <JourneySteps steps={journey_steps} runId={run.id} />
+      <JourneySteps
+        steps={journey_steps}
+        runId={run.id}
+        shareToken={run.share_token ?? undefined}
+      />
     </div>
   );
 }

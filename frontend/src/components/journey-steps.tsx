@@ -34,9 +34,12 @@ function stepStatus(value: string): JourneyStepStatus {
 export function JourneySteps({
   steps,
   runId,
+  shareToken,
 }: {
   steps: JourneyStepView[];
   runId: string;
+  /** The run's share token, so step screenshots load without a login. */
+  shareToken?: string;
 }) {
   if (steps.length === 0) return null;
 
@@ -54,7 +57,7 @@ export function JourneySteps({
         {steps.map((step, index) => {
           const status = stepStatus(step.status);
           const Icon = STATUS_ICON[status];
-          const screenshotUrl = resolveScreenshotUrl(runId, step.screenshot_url);
+          const screenshotUrl = resolveScreenshotUrl(runId, step.screenshot_url, shareToken);
           const isLast = index === steps.length - 1;
           return (
             <li key={`${step.name}-${index}`} className="flex gap-4 pb-4 last:pb-0">
