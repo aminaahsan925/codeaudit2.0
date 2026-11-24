@@ -17,3 +17,4 @@ the same PR that changes it.
 | 9 | Fix-and-verify rerun | Re-run the affected checks after a fix and mark findings fixed | Done |
 | 10 | Shareable report and PDF | Read-only shareable report link and PDF export | Done |
 | 11 | Google sign-in | Google OAuth2 login with signed sessions; demo sign-in fallback while Google is unconfigured; runs owned by the signed-in user's email | Done |
+| 12 | Local CLI | Run an audit from the terminal (`python -m app.cli run --path ...`), no web UI and no database; live checks and journey only with `--confirm-owns-domain` | Done |
