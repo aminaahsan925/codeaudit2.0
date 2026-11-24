@@ -38,6 +38,10 @@ from app.services.runs import execute_run
 SettingsFactory = Callable[..., Settings]
 
 DEMO_APP_DIR = Path.home() / "workspace" / "projects" / "launchaudit" / "demo-app"
+# Code zips come from the demo apps committed in this repo, so the
+# scan-only tests run anywhere (including CI). Only the live serving
+# still needs the old out-of-repo apps and their venv.
+REPO_DEMO_APP_DIR = Path(__file__).resolve().parents[2] / "demo-app"
 DEMO_VENV_PYTHON = DEMO_APP_DIR / "venv" / "bin" / "python"
 BROKEN_PORT = 8001
 FIXED_PORT = 8002
@@ -158,11 +162,17 @@ def _get_journey_steps(
 
 
 def _zip_demo_tree(variant: str, dest: Path) -> Path:
-    """Zip a demo app tree (code only, no runtime database)."""
-    source = DEMO_APP_DIR / variant
+    """Zip a demo app tree (code only, no runtime database or venv)."""
+    source = REPO_DEMO_APP_DIR / variant
     with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(source.rglob("*")):
-            if not path.is_file() or path.suffix in {".db"} or "__pycache__" in path.parts:
+            if (
+                not path.is_file()
+                or path.suffix in {".db"}
+                or "__pycache__" in path.parts
+                or "venv" in path.parts
+                or ".venv" in path.parts
+            ):
                 continue
             archive.write(path, path.relative_to(source))
     return dest
