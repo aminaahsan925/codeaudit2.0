@@ -27,6 +27,7 @@ from app.schemas.finding import (
     Severity,
 )
 
+from .crawl import check_broken_links_and_forms
 from .ssrf_client import SsrfBlockedError, SsrfSafeClient
 
 MAX_PROOF = 500
@@ -546,7 +547,7 @@ def run_all_checks(
     email: str | None = None,
     password: str | None = None,
 ) -> CheckOutcome:
-    """Run the seven live checks. Raises LiveAppUnreachableError when the
+    """Run the eight live checks. Raises LiveAppUnreachableError when the
     home page cannot be fetched; individual check failures are recorded as
     skipped in the returned outcome.
     """
@@ -580,4 +581,5 @@ def run_all_checks(
     _run("CORS_OPEN", check_cors, client, base_url)
     _run("INSECURE_COOKIE", check_insecure_cookies, client, base_url, home, email, password)
     _run("OPEN_ADMIN_ROUTE", check_admin_routes, client, base_url)
+    _run("BROKEN_LINKS_AND_FORMS", check_broken_links_and_forms, client, base_url, home)
     return outcome
