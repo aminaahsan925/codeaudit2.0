@@ -19,6 +19,7 @@ from app.schemas.finding import (
     FindingEngine,
     FindingStatus,
     Severity,
+    TrackingStatus,
 )
 
 
@@ -57,6 +58,8 @@ def _model_to_schema(model: FindingModel) -> Finding:
         ai_verdict=model.ai_verdict,
         fix_guidance=model.fix_guidance,
         status=FindingStatus(model.status),
+        assignee=model.assignee,
+        tracking_status=TrackingStatus(model.tracking_status),
     )
 
 
@@ -82,6 +85,8 @@ def _schema_to_model(run_id: UUID, finding: Finding) -> FindingModel:
         ),
         fix_guidance=finding.fix_guidance,
         status=finding.status.value,
+        assignee=finding.assignee,
+        tracking_status=finding.tracking_status.value,
         finding_key=finding_key_for(finding),
     )
 
@@ -105,6 +110,14 @@ class FindingRepository(BaseRepository[FindingModel]):
         model = super().get(finding_id)
         return _model_to_schema(model) if model is not None else None
 
+    def get_for_run(self, run_id: UUID, finding_id: UUID) -> Finding | None:
+        """The finding only when it belongs to this run, else None."""
+        stmt = select(FindingModel).where(
+            FindingModel.id == finding_id, FindingModel.run_id == run_id
+        )
+        model = self.session.scalars(stmt).first()
+        return _model_to_schema(model) if model is not None else None
+
     def list_for_run(self, run_id: UUID) -> list[Finding]:
         stmt = select(FindingModel).where(FindingModel.run_id == run_id)
         return [_model_to_schema(model) for model in self.session.scalars(stmt).all()]
@@ -122,5 +135,26 @@ class FindingRepository(BaseRepository[FindingModel]):
         if model is None:
             return None
         model.status = status.value
+        self.session.flush()
+        return _model_to_schema(model)
+
+    def update_assignment(
+        self,
+        finding_id: UUID,
+        *,
+        assignee: str | None,
+        tracking_status: TrackingStatus,
+    ) -> Finding | None:
+        """Set a finding's assignee and tracking status (both, at once).
+
+        Callers pass the final values: the service resolves partial PATCH
+        bodies, and the rerun passes the existing assignee through.
+        Returns None when no finding has this id.
+        """
+        model = super().get(finding_id)
+        if model is None:
+            return None
+        model.assignee = assignee
+        model.tracking_status = tracking_status.value
         self.session.flush()
         return _model_to_schema(model)

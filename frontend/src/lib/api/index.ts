@@ -26,6 +26,8 @@ export type {
   JourneyStepDefinition,
   RerunRequest,
 } from "./runs";
+export { updateFinding } from "./findings";
+export type { FindingUpdate, TrackingStatus } from "./findings";
 export {
   getReport,
   getSharedReport,

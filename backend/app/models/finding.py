@@ -42,6 +42,8 @@ class FindingModel(Base):
     ai_verdict: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     fix_guidance: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="open")
+    assignee: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    tracking_status: Mapped[str] = mapped_column(String(20), nullable=False, default="open")
     finding_key: Mapped[str] = mapped_column(String(512), nullable=False, index=True)
 
     run: Mapped["AuditRunModel"] = relationship(back_populates="findings")

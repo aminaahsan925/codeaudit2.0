@@ -14,6 +14,7 @@ export type FindingCategory = components["schemas"]["FindingCategory"];
 export type FindingEngine = components["schemas"]["FindingEngine"];
 export type Confidence = components["schemas"]["Confidence"];
 export type AIVerdictLabel = components["schemas"]["AIVerdictLabel"];
+export type TrackingStatus = components["schemas"]["TrackingStatus"];
 export type JourneyStepStatus = "passed" | "failed" | "skipped";
 
 export const SEVERITIES = ["critical", "high", "medium", "low"] as const satisfies readonly Severity[];
@@ -96,6 +97,20 @@ export const JOURNEY_STEP_STATUS_LABEL: Record<JourneyStepStatus, string> = {
   passed: "Passed",
   failed: "Failed",
   skipped: "Skipped",
+};
+
+export const TRACKING_STATUSES = [
+  "open",
+  "in_progress",
+  "fixed",
+  "ignored",
+] as const satisfies readonly TrackingStatus[];
+
+export const TRACKING_STATUS_LABEL: Record<TrackingStatus, string> = {
+  open: "Open",
+  in_progress: "In progress",
+  fixed: "Fixed",
+  ignored: "Ignored",
 };
 
 /** Formats a 0-10 risk score with one decimal, clamped to the valid range. */

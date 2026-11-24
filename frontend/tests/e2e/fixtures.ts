@@ -49,6 +49,8 @@ export function reportPayload(overrides: Record<string, unknown> = {}) {
         fix_guidance:
           "## Why it matters\n\nA leaked key lets strangers read your data.\n\n## How to fix\n\nMove the key to an environment variable and rotate it.",
         status: "open",
+        assignee: null,
+        tracking_status: "open",
       },
       {
         id: "44444444-4444-4444-8444-444444444444",
@@ -79,6 +81,8 @@ export function reportPayload(overrides: Record<string, unknown> = {}) {
         fix_guidance:
           "## Why it matters\n\nWithout a CSP, injected scripts run freely.\n\n## How to fix\n\nServe a Content-Security-Policy header.",
         status: "open",
+        assignee: null,
+        tracking_status: "open",
       },
     ],
     counts: { critical: 1, high: 0, medium: 1, low: 0 },

@@ -49,6 +49,8 @@ export function makeFinding(overrides: Partial<Finding> = {}): Finding {
     fix_guidance:
       "## Why it matters\n\nA leaked key lets strangers read your data.\n\n## How to fix\n\nMove the key to an environment variable and rotate it.",
     status: "open",
+    assignee: null,
+    tracking_status: "open",
     ...overrides,
   };
 }

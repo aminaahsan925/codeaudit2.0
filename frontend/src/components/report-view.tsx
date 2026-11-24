@@ -23,7 +23,14 @@ import { cn } from "@/lib/utils";
  * verdict and risk score, severity counts, the fix-first findings list,
  * journey steps, and the rerun comparison when this run reran an earlier one.
  */
-export function ReportView({ report }: { report: Report }) {
+export function ReportView({
+  report,
+  readOnly = false,
+}: {
+  report: Report;
+  /** True on the public shared report: findings show, but cannot be edited. */
+  readOnly?: boolean;
+}) {
   const {
     run,
     findings,
@@ -184,6 +191,7 @@ export function ReportView({ report }: { report: Report }) {
                 finding={finding}
                 index={index + 1}
                 runId={run.id}
+                readOnly={readOnly}
               />
             ))}
           </ol>

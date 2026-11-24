@@ -1,10 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { FindingCard, findingLocation } from "@/components/finding-card";
 
 import { makeFinding, RUN_ID } from "./fixtures";
+import { renderWithQueryClient } from "./test-utils";
 
 describe("findingLocation", () => {
   it("formats file and line", () => {
@@ -26,7 +27,7 @@ describe("findingLocation", () => {
 
 describe("FindingCard", () => {
   it("shows severity, title and location collapsed", () => {
-    render(<FindingCard finding={makeFinding()} index={1} runId={RUN_ID} />);
+    renderWithQueryClient(<FindingCard finding={makeFinding()} index={1} runId={RUN_ID} />);
     expect(screen.getByText("Critical")).toBeVisible();
     expect(
       screen.getByText("Database admin key is shipped to the browser"),
@@ -38,7 +39,7 @@ describe("FindingCard", () => {
 
   it("expands to show snippet, trace, evidence, AI verdict and fix guidance", async () => {
     const user = userEvent.setup();
-    render(
+    renderWithQueryClient(
       <FindingCard
         finding={makeFinding({
           trace: [
@@ -91,7 +92,7 @@ describe("FindingCard", () => {
 
   it("renders package evidence and secret previews", async () => {
     const user = userEvent.setup();
-    render(
+    renderWithQueryClient(
       <FindingCard
         finding={makeFinding({
           evidence: {
@@ -113,7 +114,7 @@ describe("FindingCard", () => {
 
   it("renders a screenshot from evidence when present", async () => {
     const user = userEvent.setup();
-    render(
+    renderWithQueryClient(
       <FindingCard
         finding={makeFinding({
           evidence: { screenshot_url: `/api/runs/${RUN_ID}/artifacts/checkout.png` },
@@ -132,7 +133,7 @@ describe("FindingCard", () => {
 
   it("hides the proof again on a second click", async () => {
     const user = userEvent.setup();
-    render(<FindingCard finding={makeFinding()} index={1} runId={RUN_ID} />);
+    renderWithQueryClient(<FindingCard finding={makeFinding()} index={1} runId={RUN_ID} />);
     await user.click(screen.getByRole("button", { name: "Show proof" }));
     expect(screen.getByText("Code")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Hide proof" }));

@@ -35,7 +35,7 @@ from app.db import get_sessionmaker
 from app.repositories.audit_runs import AuditRunRepository
 from app.repositories.findings import FindingRepository, finding_key_for
 from app.schemas.audit_run import AuditRun, AuditRunStatus
-from app.schemas.finding import Finding, FindingStatus
+from app.schemas.finding import Finding, FindingStatus, TrackingStatus
 from app.services.journeys import JourneyCredentials, run_journey
 from app.services.journeys.runner import JourneyTargetBlockedError
 from app.services.live import loopback_allowed, run_live_checks_detailed, verify_domain
@@ -293,6 +293,20 @@ def _finish_run(
                     and old_finding.status != FindingStatus.FIXED
                 ):
                     findings_repo.update_status(old_finding.id, status=FindingStatus.FIXED)
+                    # Tracking is manual and separate from the rerun status:
+                    # a rerun may auto-mark a finding fixed only while its
+                    # tracking is still open or in progress. A manual fixed
+                    # or ignored is never touched here, and a reproduced
+                    # finding is never flipped back to open.
+                    if old_finding.tracking_status in (
+                        TrackingStatus.OPEN,
+                        TrackingStatus.IN_PROGRESS,
+                    ):
+                        findings_repo.update_assignment(
+                            old_finding.id,
+                            assignee=old_finding.assignee,
+                            tracking_status=TrackingStatus.FIXED,
+                        )
         runs.update_status(
             run.id,
             status=AuditRunStatus.SUCCEEDED,

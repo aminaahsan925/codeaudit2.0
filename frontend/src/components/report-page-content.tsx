@@ -20,8 +20,11 @@ import { isActiveRunStatus } from "@/lib/report";
  */
 export function ReportPageContent({
   query,
+  readOnly = false,
 }: {
   query: UseQueryResult<Report, ApiError>;
+  /** True on the public shared report: findings show, but cannot be edited. */
+  readOnly?: boolean;
 }) {
   if (query.isPending) {
     return (
@@ -141,7 +144,7 @@ export function ReportPageContent({
 
   return (
     <div className="container-page flex flex-col gap-8 py-10 sm:py-14">
-      <ReportView report={report} />
+      <ReportView report={report} readOnly={readOnly} />
     </div>
   );
 }
