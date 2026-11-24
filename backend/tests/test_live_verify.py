@@ -1,11 +1,13 @@
-"""Domain verification: token file or home-page meta tag. The fixture
+"""Domain verification: the well-known token file only. The fixture
 server is local, so verification needs settings that allow loopback.
+A meta tag never verifies, and a token served at any other path never
+verifies.
 """
 
 import pytest
 from live_test_server import LiveTestServer, RouteResponse
 
-from app.services.live.verify import VERIFICATION_PATH, verify_domain
+from app.services.live.verify import VERIFICATION_PATH, normalize_domain, verify_domain
 
 TOKEN = "launchaudit-verify-7f3a9c2e"  # noqa: S105 - fake test value, not a secret
 
@@ -37,33 +39,29 @@ def test_wrong_token_in_file_does_not_verify(live_server, loopback_settings):
     assert verify_domain(live_server.url, TOKEN, loopback_settings) is False
 
 
-def test_meta_tag_verifies(live_server, loopback_settings):
+def test_meta_tag_does_not_verify(live_server, loopback_settings):
     live_server.routes["/"] = RouteResponse(
         status=200,
         body=(
             f'<html><head><meta name="launchaudit-verification" content="{TOKEN}"></head></html>'
         ),
     )
-    assert verify_domain(live_server.url, TOKEN, loopback_settings) is True
+    assert verify_domain(live_server.url, TOKEN, loopback_settings) is False
 
 
-def test_meta_tag_with_reversed_attributes_verifies(live_server, loopback_settings):
+def test_meta_tag_with_reversed_attributes_does_not_verify(live_server, loopback_settings):
     live_server.routes["/"] = RouteResponse(
         status=200,
         body=(
             f'<html><head><meta content="{TOKEN}" name="launchaudit-verification"></head></html>'
         ),
     )
-    assert verify_domain(live_server.url, TOKEN, loopback_settings) is True
+    assert verify_domain(live_server.url, TOKEN, loopback_settings) is False
 
 
-def test_meta_tag_with_wrong_token_does_not_verify(live_server, loopback_settings):
-    live_server.routes["/"] = RouteResponse(
-        status=200,
-        body=(
-            '<html><head><meta name="launchaudit-verification" content="wrong-token"></head></html>'
-        ),
-    )
+def test_token_at_another_path_does_not_verify(live_server, loopback_settings):
+    live_server.routes["/verification.txt"] = RouteResponse(status=200, body=TOKEN)
+    live_server.routes["/"] = RouteResponse(status=200, body=TOKEN)
     assert verify_domain(live_server.url, TOKEN, loopback_settings) is False
 
 
@@ -88,3 +86,27 @@ def test_blocked_target_does_not_verify(live_server):
 def test_empty_token_or_url_does_not_verify(live_server, loopback_settings):
     assert verify_domain(live_server.url, "", loopback_settings) is False
     assert verify_domain("", TOKEN, loopback_settings) is False
+
+
+def test_normalize_domain_lowercases_and_strips_trailing_dot():
+    assert normalize_domain("Shop.EXAMPLE.com.") == "shop.example.com"
+    assert normalize_domain("  example.com  ") == "example.com"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        "https://example.com",
+        "example.com/path",
+        "example.com:8443",
+        "user@example.com",
+        "exa mple.com",
+        "exa_mple.com",
+        "-example.com",
+        "example-.com",
+        "a" * 254,
+    ],
+)
+def test_normalize_domain_rejects_non_domains(value):
+    assert normalize_domain(value) is None
