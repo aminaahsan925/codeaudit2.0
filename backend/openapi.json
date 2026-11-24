@@ -442,6 +442,18 @@
               }
             ]
           },
+          "assignee": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee"
+          },
           "category": {
             "$ref": "#/components/schemas/FindingCategory"
           },
@@ -551,6 +563,10 @@
             },
             "title": "Trace",
             "type": "array"
+          },
+          "tracking_status": {
+            "$ref": "#/components/schemas/TrackingStatus",
+            "default": "open"
           }
         },
         "required": [
@@ -570,7 +586,9 @@
           "evidence",
           "ai_verdict",
           "fix_guidance",
-          "status"
+          "status",
+          "assignee",
+          "tracking_status"
         ],
         "title": "Finding",
         "type": "object"
@@ -614,6 +632,35 @@
         ],
         "title": "FindingStatus",
         "type": "string"
+      },
+      "FindingUpdate": {
+        "description": "PATCH body for a finding's assignment and tracking status.\n\nBoth fields are optional; only the fields present in the request change\n(checked via `model_fields_set`). `tracking_status` stays a plain string\nhere so the service can reject an unknown value with a 400 instead of\nFastAPI's 422, and so an over-long assignee gets the same treatment.\nAn empty or blank assignee clears the assignment.",
+        "properties": {
+          "assignee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee"
+          },
+          "tracking_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tracking Status"
+          }
+        },
+        "title": "FindingUpdate",
+        "type": "object"
       },
       "HTTPValidationError": {
         "properties": {
@@ -1023,6 +1070,17 @@
         ],
         "title": "TraceStep",
         "type": "object"
+      },
+      "TrackingStatus": {
+        "description": "Manual fix tracking, separate from the rerun-driven `FindingStatus`.\n\nA rerun never flips a manual `fixed` or `ignored` back to `open`; it may\nonly auto-mark a finding `fixed` while its tracking status is `open` or\n`in_progress` (see `app.services.runs.runner._finish_run`).",
+        "enum": [
+          "open",
+          "in_progress",
+          "fixed",
+          "ignored"
+        ],
+        "title": "TrackingStatus",
+        "type": "string"
       },
       "UserResponse": {
         "description": "A signed-in user, as the frontend shows them.",
@@ -1657,6 +1715,104 @@
         "summary": "Get a run artifact",
         "tags": [
           "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/findings/{finding_id}": {
+      "patch": {
+        "operationId": "update_finding_api_runs__run_id__findings__finding_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "finding_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Finding Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FindingUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Finding"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Assign a finding and track its fix",
+        "tags": [
+          "findings"
         ]
       }
     },
