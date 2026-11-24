@@ -71,6 +71,9 @@ def seeded_run(session: Session) -> AuditRun:
             verdict=Verdict.DO_NOT_LAUNCH,
             risk_score=8.3,
             share_token=SHARE_TOKEN,
+            # A guest run: its report stays open by run id, and the PDF
+            # still needs the dev token stub or the share token.
+            is_guest=True,
         )
     )
     findings.create_many(
