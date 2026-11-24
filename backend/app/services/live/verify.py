@@ -1,9 +1,14 @@
 """Domain ownership verification for live checks.
 
-The owner proves they control a domain in one of two ways: serving the
-verification token at /.well-known/launchaudit-verification.txt, or adding
-a `<meta name="launchaudit-verification" content="<token>">` tag to the
-home page. Live checks run only after verification passes.
+The server issues the token: the owner requests one for a domain, serves
+it at /.well-known/launchaudit-verification.txt, and asks the server to
+check it. The token is stored server-side, so a run can only probe a
+domain whose owner placed the server-issued token there. A
+client-supplied token proves nothing and is never accepted.
+
+The well-known file is the only verification path. A meta tag is weaker:
+on some sites user content can inject markup into the home page, so a
+tag is not proof of control over the domain.
 
 Verification fetches go through the same SSRF-safe client as the checks,
 so a verification attempt can never be used to probe internal addresses.
@@ -12,6 +17,7 @@ so a verification attempt can never be used to probe internal addresses.
 from __future__ import annotations
 
 import hmac
+import ipaddress
 import re
 from typing import TYPE_CHECKING
 
@@ -23,14 +29,58 @@ if TYPE_CHECKING:
     from app.core.config import Settings
 
 VERIFICATION_PATH = "/.well-known/launchaudit-verification.txt"
-META_NAME = "launchaudit-verification"
 
-_META_TAG_RE = re.compile(r"<meta[^>]+>", re.IGNORECASE)
-_META_ATTR_RE = re.compile(r"""([\w-]+)\s*=\s*["']([^"']*)["']""")
+_LABEL_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 
 
 class DomainNotVerifiedError(RuntimeError):
     """Raised when live checks are asked to run on an unverified domain."""
+
+
+def normalize_domain(value: str) -> str | None:
+    """Normalize a domain (host) to lowercase without a trailing dot.
+
+    Returns None when the value is not a bare domain: no scheme, path,
+    port, userinfo or whitespace, labels of letters, digits and hyphens
+    only, at most 253 characters. Used for token lookup and storage so
+    the same domain always maps to the same stored token.
+    """
+    host = value.strip().lower().rstrip(".")
+    if not host or len(host) > 253:
+        return None
+    if any(char in host for char in ("/", ":", "@", " ", "\t", "\n", "\r")):
+        return None
+    if not all(_LABEL_RE.match(label) for label in host.split(".")):
+        return None
+    return host
+
+
+def is_local_domain(domain: str) -> bool:
+    """True for localhost names and loopback/private IP literals.
+
+    Local targets never need a token: the runner treats them as verified
+    when loopback checks are enabled outside production.
+    """
+    host = domain.strip().lower().rstrip(".")
+    if host == "localhost" or host.endswith((".localhost", ".local")):
+        return True
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return (
+        address.is_loopback
+        or address.is_private
+        or address.is_link_local
+        or address.is_reserved
+        or address.is_multicast
+        or address.is_unspecified
+    )
+
+
+def verification_url_for(domain: str) -> str:
+    """The exact HTTPS URL a domain owner must serve the token at."""
+    return f"https://{domain}{VERIFICATION_PATH}"
 
 
 def _tokens_equal(candidate: str, token: str) -> bool:
@@ -40,9 +90,9 @@ def _tokens_equal(candidate: str, token: str) -> bool:
         return False
 
 
-def _token_file_matches(client: SsrfSafeClient, base_url: str, token: str) -> bool:
+def _token_file_matches(client: SsrfSafeClient, url: str, token: str) -> bool:
     try:
-        response = client.get(base_url + VERIFICATION_PATH)
+        response = client.get(url)
     except (httpx.HTTPError, SsrfBlockedError):
         return False
     if response.status_code != 200:
@@ -50,25 +100,12 @@ def _token_file_matches(client: SsrfSafeClient, base_url: str, token: str) -> bo
     return any(_tokens_equal(line.strip(), token) for line in response.text.splitlines())
 
 
-def _meta_tag_matches(client: SsrfSafeClient, base_url: str, token: str) -> bool:
-    try:
-        response = client.get(base_url + "/")
-    except (httpx.HTTPError, SsrfBlockedError):
-        return False
-    if response.status_code != 200:
-        return False
-    for tag in _META_TAG_RE.findall(response.text or ""):
-        attrs = {name.lower(): value for name, value in _META_ATTR_RE.findall(tag)}
-        content = attrs.get("name") == META_NAME and attrs.get("content")
-        if content and _tokens_equal(content.strip(), token):
-            return True
-    return False
-
-
 def verify_domain(url: str, token: str, settings: Settings | None = None) -> bool:
-    """True when the domain at `url` serves `token` as a verification file
-    or a home-page meta tag. Never raises for network or SSRF problems:
-    anything that cannot be verified is simply unverified.
+    """True when the domain at `url` serves `token` at the well-known path.
+
+    Only the well-known file counts; a meta tag never verifies. Never
+    raises for network or SSRF problems: anything that cannot be verified
+    is simply unverified.
 
     Pass `settings` when loopback/private targets should be reachable
     (local demos with allow_loopback_live_checks); without settings they
@@ -79,6 +116,17 @@ def verify_domain(url: str, token: str, settings: Settings | None = None) -> boo
     base_url = url.rstrip("/")
     allow_loopback = loopback_allowed(settings) if settings is not None else False
     with SsrfSafeClient(allow_loopback) as client:
-        if _token_file_matches(client, base_url, token):
-            return True
-        return _meta_tag_matches(client, base_url, token)
+        return _token_file_matches(client, base_url + VERIFICATION_PATH, token)
+
+
+def verify_host_token(domain: str, token: str, settings: Settings | None = None) -> bool:
+    """True when `domain` serves `token` at its exact well-known HTTPS URL.
+
+    The fetch goes to https://<domain>/.well-known/launchaudit-verification.txt
+    and nowhere else: a token served at any other path, or on the home
+    page, does not verify. Never raises for network or SSRF problems.
+    """
+    normalized = normalize_domain(domain)
+    if normalized is None or not token:
+        return False
+    return verify_domain(f"https://{normalized}", token, settings)

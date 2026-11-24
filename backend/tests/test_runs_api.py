@@ -33,7 +33,6 @@ from app.repositories.audit_runs import AuditRunRepository
 SettingsFactory = Callable[..., Settings]
 
 TEST_PASSWORD = "TestPass123"  # noqa: S105 - test-only journey password
-TEST_DOMAIN_TOKEN = "verify-me"  # noqa: S105 - test-only domain token
 
 
 def _zip_bytes(files: dict[str, str]) -> bytes:
@@ -361,7 +360,6 @@ def test_rerun_copies_inputs_and_links_previous(
         json={
             "journey_email": "tester@example.com",
             "journey_password": TEST_PASSWORD,
-            "domain_token": TEST_DOMAIN_TOKEN,
         },
     )
 
@@ -381,7 +379,10 @@ def test_rerun_copies_inputs_and_links_previous(
     assert rerun_call["run_id"] == UUID(body["id"])
     assert rerun_call["journey_email"] == "tester@example.com"
     assert rerun_call["journey_password"] == TEST_PASSWORD
-    assert rerun_call["domain_token"] == TEST_DOMAIN_TOKEN
+    # The pipeline gets the run owner (None for a guest run) so it can look
+    # up the stored server-issued domain token; no token comes from the client.
+    assert rerun_call["owner"] is None
+    assert "domain_token" not in rerun_call
 
 
 def test_rerun_of_owned_run_requires_auth(client: TestClient, api_token: str) -> None:

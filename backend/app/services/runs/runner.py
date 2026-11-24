@@ -7,8 +7,9 @@ never holds a session open.
 
 Scanned code is read, never run, never imported. Clones and extracted
 trees live in a temp dir that is deleted when the run finishes, success or
-fail. Journey credentials and the domain token exist only in memory for
-the run and are never persisted.
+fail. Journey credentials exist only in memory for the run and are never
+persisted. Domain verification uses the server-issued token stored for
+the domain and the run owner, never a client-supplied token.
 
 Progress: 5 running, 15 code fetched, 40 code scan done, 60 live checks
 done, 80 journey done, 85 dedupe done, 90 AI review done, 100 finished.
@@ -33,12 +34,14 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings
 from app.db import get_sessionmaker
 from app.repositories.audit_runs import AuditRunRepository
+from app.repositories.domain_verifications import DomainVerificationRepository
 from app.repositories.findings import FindingRepository, finding_key_for
 from app.schemas.audit_run import AuditRun, AuditRunStatus
 from app.schemas.finding import Finding, FindingStatus, TrackingStatus
 from app.services.journeys import JourneyCredentials, run_journey
 from app.services.journeys.runner import JourneyTargetBlockedError
 from app.services.live import loopback_allowed, run_live_checks_detailed, verify_domain
+from app.services.live.verify import normalize_domain
 from app.services.report.scoring import compute_risk, verdict_for
 from app.services.scan import dedupe_findings, run_code_scan
 
@@ -123,19 +126,36 @@ def _fetch_code(run: AuditRun, upload_path: Path | None, tmp_path: Path) -> Path
     raise CodeInputError("No code was provided for this run.")
 
 
+def _stored_domain_token(
+    session_factory: SessionFactory | None, domain: str, owner: str | None
+) -> str | None:
+    """The server-issued token stored for a domain and owner, if any.
+
+    Signed-in runs look up the owner's token; guest runs (owner None)
+    look up the guest token for the domain, since a guest has no
+    identity to scope by.
+    """
+    with _make_session(session_factory) as session:
+        record = DomainVerificationRepository(session).get(domain, owner)
+    return record.token if record is not None else None
+
+
 def _verify_live_domain(
     run: AuditRun,
     settings: Settings,
     session_factory: SessionFactory | None,
-    domain_token: str | None,
+    owner: str | None,
 ) -> bool:
     """Whether the run's live URL may be probed.
 
     A loopback or private target counts as verified when loopback checks
-    are enabled outside production; otherwise the domain token must
-    verify. The run row is marked verified when the check passes. Both
-    live checks and the journey use this one outcome: an unverified
-    domain is never probed and never driven in a browser.
+    are enabled outside production; otherwise the domain must serve the
+    server-issued token stored for it (scoped to the run owner, or by
+    domain only for a guest run). The token file is re-fetched at run
+    time, so removing the file unverifies the domain. The run row is
+    marked verified when the check passes. Both live checks and the
+    journey use this one outcome: an unverified domain is never probed
+    and never driven in a browser.
     """
     if run.live_url is None:
         return False
@@ -145,8 +165,11 @@ def _verify_live_domain(
     if _is_loopback_or_private_host(host) and loopback_allowed(settings):
         verified = True
         logger.info("Run %s: live target is local, treated as verified.", run.id)
-    elif domain_token:
-        verified = verify_domain(live_url, domain_token, settings)
+    else:
+        domain = normalize_domain(host)
+        token = _stored_domain_token(session_factory, domain, owner) if domain is not None else None
+        if token:
+            verified = verify_domain(live_url, token, settings)
     if verified:
         _update_domain_verified(session_factory, run.id)
     return verified
@@ -325,7 +348,7 @@ def _run_pipeline(
     upload_path: Path | None,
     journey_email: str | None,
     journey_password: str | None,
-    domain_token: str | None,
+    owner: str | None,
 ) -> None:
     run_id = run.id
     _update_status(
@@ -340,7 +363,7 @@ def _run_pipeline(
         _update_status(session_factory, run_id, progress=15)
         code_findings = run_code_scan(tree).findings
         _update_status(session_factory, run_id, progress=40)
-        verified = _verify_live_domain(run, settings, session_factory, domain_token)
+        verified = _verify_live_domain(run, settings, session_factory, owner)
         live_findings = _live_stage(
             run, settings, session_factory, journey_email, journey_password, verified
         )
@@ -365,15 +388,17 @@ def execute_run(
     upload_path: Path | None = None,
     journey_email: str | None = None,
     journey_password: str | None = None,
-    domain_token: str | None = None,
+    owner: str | None = None,
 ) -> None:
     """Run one audit to completion, updating the run row as stages finish.
 
     `upload_path` is the saved zip for upload runs (the router stores it at
     artifact_dir/{run_id}/upload.zip before starting this task); repo runs
-    re-fetch from the run's repo_url. Journey credentials and the domain
-    token are in-memory only and are never persisted. When `review_fn` is
-    None, the AI review module is imported lazily and skipped if absent.
+    re-fetch from the run's repo_url. Journey credentials are in-memory
+    only and are never persisted. `owner` is the run owner's subject
+    (None for a guest run); it scopes the stored domain-token lookup.
+    When `review_fn` is None, the AI review module is imported lazily
+    and skipped if absent.
     """
     try:
         run = _load_run(session_factory, run_id)
@@ -392,7 +417,7 @@ def execute_run(
             upload_path,
             journey_email,
             journey_password,
-            domain_token,
+            owner,
         )
     except CodeInputError as exc:
         logger.info("Audit run %s failed: %s", run_id, exc)

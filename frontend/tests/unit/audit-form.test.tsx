@@ -41,7 +41,8 @@ describe("AuditForm", () => {
     expect(screen.getByLabelText("Live URL")).toBeVisible();
     expect(screen.getByLabelText("Journey test email")).toBeVisible();
     expect(screen.getByLabelText("Journey test password")).toBeVisible();
-    expect(screen.getByLabelText("Domain verification token")).toBeVisible();
+    expect(screen.queryByLabelText("Domain verification token")).toBeNull();
+    expect(screen.getByText(/request a token/)).toBeVisible();
     expect(screen.getByText(/No account needed/)).toBeVisible();
   });
 

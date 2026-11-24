@@ -8,7 +8,7 @@ import logging
 
 from fastapi import FastAPI
 
-from app.api.routers import auth, findings, health, reports, runs
+from app.api.routers import auth, findings, health, reports, runs, verification
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
@@ -67,6 +67,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(runs.router, prefix=API_PREFIX)
     app.include_router(findings.router, prefix=API_PREFIX)
     app.include_router(reports.router, prefix=API_PREFIX)
+    app.include_router(verification.router, prefix=API_PREFIX)
 
     logger.info(
         "Application configured",

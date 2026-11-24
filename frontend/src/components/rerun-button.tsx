@@ -13,9 +13,10 @@ const inputClasses =
   "h-9 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 /**
- * Re-runs the audit after fixes. Journey credentials and the domain token
- * are never stored by the API, so the button offers fields for fresh ones;
- * without them the rerun still re-scans the code and the live URL.
+ * Re-runs the audit after fixes. Journey credentials are never stored by
+ * the API, so the button offers fields for fresh ones; without them the
+ * rerun still re-scans the code and the live URL. Domain verification
+ * reuses the stored server-issued token for the domain and owner.
  */
 export function RerunButton({
   runId,
@@ -32,7 +33,6 @@ export function RerunButton({
   const [showForm, setShowForm] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [domainToken, setDomainToken] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -49,12 +49,9 @@ export function RerunButton({
     const payload: RerunRequest = {
       journey_email: hasEmail ? trimmedEmail : null,
       journey_password: hasPassword ? password : null,
-      domain_token: domainToken.trim() ? domainToken.trim() : null,
     };
     const hasPayload =
-      payload.journey_email !== null ||
-      payload.journey_password !== null ||
-      payload.domain_token !== null;
+      payload.journey_email !== null || payload.journey_password !== null;
     // Await the mutation: per-call onSuccess is dropped when the observer
     // loses its listeners (e.g. a remount mid-request), which would
     // silently swallow the navigation.
@@ -122,19 +119,6 @@ export function RerunButton({
               autoComplete="off"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className={inputClasses}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="rerun-domain-token" className="text-sm font-medium">
-              Domain verification token <span className="text-muted-foreground">(optional)</span>
-            </label>
-            <input
-              id="rerun-domain-token"
-              type="text"
-              autoComplete="off"
-              value={domainToken}
-              onChange={(event) => setDomainToken(event.target.value)}
               className={inputClasses}
             />
           </div>

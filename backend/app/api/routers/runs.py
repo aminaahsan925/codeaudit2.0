@@ -2,9 +2,11 @@
 
 POST /api/runs accepts guests (no auth) and owners (a valid bearer token
 makes the run owned). The pipeline runs as a FastAPI BackgroundTask; the
-response returns the run with status queued. Journey credentials and the
-domain token are passed to the background task in memory only and are
-never persisted.
+response returns the run with status queued. Journey credentials are
+passed to the background task in memory only and are never persisted.
+Domain verification uses the server-issued token stored for the domain
+and the run owner (see the verification router); no token is accepted
+from the client.
 """
 
 from __future__ import annotations
@@ -93,7 +95,6 @@ async def create_run(
     zip_file: Annotated[UploadFile | None, File()] = None,
     journey_email: Annotated[str | None, Form(max_length=320)] = None,
     journey_password: Annotated[str | None, Form(max_length=1024)] = None,
-    domain_token: Annotated[str | None, Form(max_length=1024)] = None,
     journey_definition: Annotated[str | None, Form(max_length=MAX_JOURNEY_DEFINITION_CHARS)] = None,
 ) -> AuditRun:
     if repo_url is None and zip_file is None:
@@ -142,7 +143,7 @@ async def create_run(
         upload_path=upload_path,
         journey_email=journey_email,
         journey_password=journey_password,
-        domain_token=domain_token,
+        owner=principal.subject if principal is not None else None,
     )
     return created
 
@@ -220,7 +221,7 @@ async def rerun_run(
         upload_path=upload_path,
         journey_email=rerun.journey_email,
         journey_password=rerun.journey_password,
-        domain_token=rerun.domain_token,
+        owner=owner,
     )
     return created
 

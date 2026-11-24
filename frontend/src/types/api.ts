@@ -282,6 +282,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/verification/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check a domain verification file */
+        post: operations["check_domain_api_verification_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/verification/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Request a domain verification token */
+        post: operations["request_token_api_verification_token_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -356,8 +390,6 @@ export interface components {
         AuditRunStatus: "queued" | "running" | "succeeded" | "failed" | "cancelled";
         /** Body_create_run_api_runs_post */
         Body_create_run_api_runs_post: {
-            /** Domain Token */
-            domain_token?: string | null;
             /** Journey Definition */
             journey_definition?: string | null;
             /** Journey Email */
@@ -634,11 +666,11 @@ export interface components {
          *
          *     Journey credentials are never persisted: a rerun copies only the
          *     project name, repo URL and live URL from the original run, so the
-         *     caller supplies fresh credentials (and a fresh domain token) here.
+         *     caller supplies fresh credentials here. Domain verification uses
+         *     the stored server-issued token for the domain and owner; no token
+         *     is accepted from the client.
          */
         RerunRequest: {
-            /** Domain Token */
-            domain_token?: string | null;
             /** Journey Email */
             journey_email?: string | null;
             /** Journey Password */
@@ -721,6 +753,46 @@ export interface components {
          * @enum {string}
          */
         Verdict: "launch" | "fix_first" | "do_not_launch";
+        /**
+         * VerificationCheckRequest
+         * @description Ask the server to check the token file for a domain.
+         */
+        VerificationCheckRequest: {
+            /** Domain */
+            domain: string;
+        };
+        /**
+         * VerificationCheckResponse
+         * @description Whether the domain currently serves its stored token.
+         */
+        VerificationCheckResponse: {
+            /** Domain */
+            domain: string;
+            /** Verified */
+            verified: boolean;
+            /** Verified At */
+            verified_at: string | null;
+        };
+        /**
+         * VerificationTokenRequest
+         * @description Ask the server to issue a token for a domain.
+         */
+        VerificationTokenRequest: {
+            /** Domain */
+            domain: string;
+        };
+        /**
+         * VerificationTokenResponse
+         * @description The fresh token and the exact URL it must be served at.
+         */
+        VerificationTokenResponse: {
+            /** Domain */
+            domain: string;
+            /** Token */
+            token: string;
+            /** Verification Url */
+            verification_url: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -1347,6 +1419,90 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    check_domain_api_verification_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerificationCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerificationCheckResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_token_api_verification_token_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerificationTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerificationTokenResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

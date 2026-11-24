@@ -44,10 +44,10 @@ def run_live_checks_detailed(
     """
     if not verified:
         raise DomainNotVerifiedError(
-            "Live checks refused: the domain has not been verified. Serve "
-            "the verification token at "
-            "/.well-known/launchaudit-verification.txt or add it as a meta "
-            "tag on the home page, then verify the domain and retry."
+            "Live checks refused: the domain has not been verified. Request "
+            "a verification token (POST /api/verification/token), serve it "
+            "at https://<domain>/.well-known/launchaudit-verification.txt, "
+            "then check it (POST /api/verification/check) and retry."
         )
     if not url or not url.strip():
         return LiveCheckResult(status="skipped", skipped_reason="No live app URL was given.")
