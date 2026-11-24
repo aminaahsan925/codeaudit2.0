@@ -96,11 +96,13 @@ function HttpEvidenceView({ http }: { http: HttpEvidence }) {
 function EvidenceView({
   evidence,
   runId,
+  shareToken,
 }: {
   evidence: Evidence;
   runId: string;
+  shareToken?: string;
 }) {
-  const screenshotUrl = resolveScreenshotUrl(runId, evidence.screenshot_url);
+  const screenshotUrl = resolveScreenshotUrl(runId, evidence.screenshot_url, shareToken);
   const hasAnything =
     Boolean(evidence.http) ||
     Boolean(evidence.package) ||
@@ -168,6 +170,7 @@ export function FindingCard({
   index,
   runId,
   defaultOpen = false,
+  shareToken,
   readOnly = false,
 }: {
   finding: Finding;
@@ -175,6 +178,8 @@ export function FindingCard({
   index: number;
   runId: string;
   defaultOpen?: boolean;
+  /** The run's share token, so the evidence screenshot loads without a login. */
+  shareToken?: string;
   /** True on the public shared report: assignment shows, but cannot change. */
   readOnly?: boolean;
 }) {
@@ -253,7 +258,7 @@ export function FindingCard({
           ) : null}
 
           <TraceList trace={finding.trace} />
-          <EvidenceView evidence={finding.evidence} runId={runId} />
+          <EvidenceView evidence={finding.evidence} runId={runId} shareToken={shareToken} />
 
           {finding.ai_verdict ? (
             <div className="flex flex-col gap-1 rounded-md border bg-muted/50 px-3 py-2">
