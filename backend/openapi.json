@@ -743,9 +743,59 @@
         "title": "JourneyStepView",
         "type": "object"
       },
-      "MeResponse": {
-        "description": "The authenticated principal.",
+      "LogoutResponse": {
+        "description": "Sign-out confirmation. Sessions live client-side, so there is nothing\nto clear server-side; the frontend discards the token.",
         "properties": {
+          "signed_out": {
+            "default": true,
+            "title": "Signed Out",
+            "type": "boolean"
+          }
+        },
+        "title": "LogoutResponse",
+        "type": "object"
+      },
+      "MeResponse": {
+        "description": "The authenticated principal.\n\nFor a session sign-in the user fields are filled in; for the development\ntoken stub only `subject` is set (to \"dev\").",
+        "properties": {
+          "demo": {
+            "default": false,
+            "title": "Demo",
+            "type": "boolean"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "picture_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Picture Url"
+          },
           "subject": {
             "title": "Subject",
             "type": "string"
@@ -778,6 +828,25 @@
           "advisory"
         ],
         "title": "PackageEvidence",
+        "type": "object"
+      },
+      "ProvidersResponse": {
+        "description": "Which sign-in options actually work right now.",
+        "properties": {
+          "demo": {
+            "title": "Demo",
+            "type": "boolean"
+          },
+          "google": {
+            "title": "Google",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "google",
+          "demo"
+        ],
+        "title": "ProvidersResponse",
         "type": "object"
       },
       "ReportResponse": {
@@ -892,6 +961,29 @@
         "title": "RerunRequest",
         "type": "object"
       },
+      "SessionResponse": {
+        "description": "A fresh session: the token plus the user it belongs to.",
+        "properties": {
+          "demo": {
+            "title": "Demo",
+            "type": "boolean"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserResponse"
+          }
+        },
+        "required": [
+          "token",
+          "user",
+          "demo"
+        ],
+        "title": "SessionResponse",
+        "type": "object"
+      },
       "Severity": {
         "enum": [
           "critical",
@@ -930,6 +1022,55 @@
           "label"
         ],
         "title": "TraceStep",
+        "type": "object"
+      },
+      "UserResponse": {
+        "description": "A signed-in user, as the frontend shows them.",
+        "properties": {
+          "demo": {
+            "title": "Demo",
+            "type": "boolean"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "picture_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Picture Url"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name",
+          "picture_url",
+          "demo"
+        ],
+        "title": "UserResponse",
         "type": "object"
       },
       "ValidationError": {
@@ -996,6 +1137,170 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/auth/demo-login": {
+      "post": {
+        "description": "Sign in as the clearly-labelled local demo user. Only available while\nGoogle sign-in is unconfigured; disabled as soon as Google is set up.",
+        "operationId": "demo_login_api_auth_demo_login_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "Demo sign-in (no Google account)",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/google/callback": {
+      "get": {
+        "description": "Finish Google sign-in: verify the state, swap the code, sign the user\nin, and send the browser back to the frontend with a session token.",
+        "operationId": "google_callback_api_auth_google_callback_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "error",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error"
+            }
+          }
+        ],
+        "responses": {
+          "307": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Google sign-in callback",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/google/login": {
+      "get": {
+        "description": "Redirect the browser to Google's sign-in page.",
+        "operationId": "google_login_api_auth_google_login_get",
+        "responses": {
+          "307": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "Start Google sign-in",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "description": "Sessions live client-side, so there is nothing to clear server-side;\nthe frontend discards its token.",
+        "operationId": "logout_api_auth_logout_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoutResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sign out",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/me": {
       "get": {
         "operationId": "me_api_auth_me_get",
@@ -1027,6 +1332,28 @@
           }
         ],
         "summary": "Current principal",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/providers": {
+      "get": {
+        "description": "Which sign-in options actually work: Google when it is configured,\ndemo sign-in only while Google is not.",
+        "operationId": "providers_api_auth_providers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvidersResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Available sign-in providers",
         "tags": [
           "auth"
         ]
