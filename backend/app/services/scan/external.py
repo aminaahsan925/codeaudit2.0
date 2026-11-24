@@ -8,6 +8,7 @@ Binaries are looked up on PATH first, then in backend/tools/ (release
 binaries downloaded there), then in backend/.venv/bin.
 """
 
+import contextlib
 import json
 import os
 import re
@@ -83,38 +84,106 @@ def find_tool(name: str, tools_dir: Path | None = None) -> str | None:
     return None
 
 
+# One server-owned HOME for all scanner runs. It starts empty and holds
+# only scanner caches (semgrep's downloaded rules). A fresh HOME per call
+# would force semgrep to re-download its rules on every scan (30s or more
+# each, sometimes failing outright); one shared empty dir keeps the cache
+# warm while still hiding the server's real home from scanners.
+_SCANNER_HOME_NAME = "launchaudit-scanner-home"
+
+
+def _scanner_home() -> Path:
+    """The persistent, server-owned HOME scanners run with."""
+    home = Path(tempfile.gettempdir()) / _SCANNER_HOME_NAME
+    home.mkdir(parents=True, exist_ok=True)
+    with contextlib.suppress(OSError):
+        home.chmod(0o700)
+    return home
+
+
+# Proxy vars scanners may need to reach the network (semgrep fetches its
+# rules, osv-scanner queries the OSV API). Passed with any userinfo
+# stripped, so proxy credentials never reach a scanner process.
+_PROXY_VARS = ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy")
+_NO_PROXY_VARS = ("NO_PROXY", "no_proxy")
+
+
+def _strip_proxy_auth(url: str) -> str | None:
+    """A proxy URL with its userinfo removed, or None if unparseable.
+
+    An unparseable value is dropped rather than passed through raw: a
+    scanner without a proxy may fail, but a credential must never leak.
+    """
+    from urllib.parse import urlparse, urlunparse
+
+    candidate = url if "://" in url else "http://" + url
+    try:
+        parsed = urlparse(candidate)
+        host = parsed.hostname or ""
+        if not host:
+            return None
+        if ":" in host and not host.startswith("["):
+            host = f"[{host}]"
+        netloc = host + (f":{parsed.port}" if parsed.port else "")
+        return urlunparse((parsed.scheme, netloc, "", "", "", ""))
+    except ValueError:
+        return None
+
+
+def _scanner_env() -> dict[str, str]:
+    """The minimal env scanners run with.
+
+    PATH and HOME (the server-owned scanner dir) plus, when set, the
+    proxy vars with credentials stripped and the no-proxy lists passed
+    through unchanged. Nothing else from the server env leaks through:
+    no API keys, no database URLs, no session secrets.
+    """
+    env = {"PATH": os.environ.get("PATH", ""), "HOME": str(_scanner_home())}
+    for name in _PROXY_VARS:
+        value = os.environ.get(name)
+        if not value:
+            continue
+        stripped = _strip_proxy_auth(value)
+        if stripped is not None:
+            env[name] = stripped
+    for name in _NO_PROXY_VARS:
+        value = os.environ.get(name)
+        if value:
+            env[name] = value
+    return env
+
+
 def _run(
     command: list[str], timeout: int, cwd: Path | None = None
 ) -> tuple[int | None, str, str, bool]:
     """Run a scanner. Returns (returncode, stdout, stderr, timed_out).
 
-    The scanner gets a minimal env (PATH and HOME only): it scans
+    The scanner gets a minimal env (see _scanner_env): it scans
     untrusted code, so no server secret may leak into its process.
-    HOME is a fresh temp dir per call, removed when the scanner exits,
-    so a scanner can neither read the server's home (git config,
-    credentials) nor write anything there.
+    HOME is the server-owned scanner dir (see _scanner_home), so a
+    scanner can neither read the server's real home (git config,
+    credentials) nor write anything there, and its caches stay warm
+    between runs.
     """
-    # A fresh HOME per call, removed when the scanner exits.
-    with tempfile.TemporaryDirectory(prefix="launchaudit-scanner-") as home:
-        env = {"PATH": os.environ.get("PATH", ""), "HOME": home}
-        try:
-            # The command is a resolved tool binary plus fixed flags; the
-            # scanned tree path is one argument, never a shell command
-            # (shell=False), so it cannot inject anything.
-            proc = subprocess.run(  # noqa: S603
-                command,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                cwd=cwd,
-                shell=False,
-                env=env,
-            )
-            return proc.returncode, proc.stdout, proc.stderr, False
-        except subprocess.TimeoutExpired:
-            return None, "", "timed out", True
-        except OSError as exc:
-            return None, "", str(exc), False
+    env = _scanner_env()
+    try:
+        # The command is a resolved tool binary plus fixed flags; the
+        # scanned tree path is one argument, never a shell command
+        # (shell=False), so it cannot inject anything.
+        proc = subprocess.run(  # noqa: S603
+            command,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=cwd,
+            shell=False,
+            env=env,
+        )
+        return proc.returncode, proc.stdout, proc.stderr, False
+    except subprocess.TimeoutExpired:
+        return None, "", "timed out", True
+    except OSError as exc:
+        return None, "", str(exc), False
 
 
 def _detect_frameworks(tree: Path) -> set[str]:

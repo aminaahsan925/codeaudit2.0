@@ -274,10 +274,13 @@ A second review found five more issues, fixed on `feat/security-hardening`:
 - **Zip uploads strip `.git`, scanners get a minimal env**: a malicious
   `.git` in an upload could carry hooks and git config that execute when
   a scanner runs git in the tree, so `extract_zip` now skips every member
-  under `.git/`. Scanner subprocesses run with only `PATH` and `HOME`
-  (a fresh temp dir per call), so no server secret leaks into a scanner.
-  Trade-off: gitleaks history findings now fire only for GitHub-clone
-  runs, never for zip uploads.
+  under `.git/`. Scanner subprocesses run with only an allowlisted env:
+  `PATH`, a server-owned scanner `HOME` (shared so scanner caches stay
+  warm; a fresh HOME per call forced semgrep to re-download its rules
+  every time), and the proxy vars with credentials stripped (scanners
+  need the network for rules and advisories, and a proxied deployment
+  breaks without them). Trade-off: gitleaks history findings now fire
+  only for GitHub-clone runs, never for zip uploads.
 - **pip-audit runs with `--no-deps --disable-pip`**: without the flags it
   resolves and can install the scanned project's packages. The flags
   match the existing parser, which already skips transitive dependencies.

@@ -277,11 +277,13 @@ def test_cve_tools_skipped_without_manifests(tmp_path, fake_tools) -> None:
 
 
 def test_scanners_run_with_minimal_env(tmp_path, monkeypatch) -> None:
-    """Every scanner subprocess gets PATH and HOME only, nothing else.
+    """Every scanner subprocess gets only the allowlisted env.
 
     A marker var set in the server env must not reach the child, and the
-    temp HOME handed to the child must exist while it runs and be gone
-    once the scan returns.
+    HOME handed to the child is the shared scanner dir: it exists while
+    the child runs and stays afterwards (scanner caches live there), it
+    is the same dir for every scanner call, and it is not the server's
+    real home. Proxy vars pass through only with credentials stripped.
     """
     seen_envs: list[dict[str, str]] = []
     homes_existed: list[bool] = []
@@ -297,15 +299,35 @@ def test_scanners_run_with_minimal_env(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("LAUNCHAUDIT_MARKER_SECRET", "do-not-leak")
     run_external_tools(tmp_path, [])
     assert seen_envs, "expected at least one scanner subprocess call"
+    homes = {env["HOME"] for env in seen_envs}
+    assert len(homes) == 1, "all scanner calls share one HOME"
+    home = Path(seen_envs[0]["HOME"])
+    assert home.is_dir(), "the scanner HOME persists after the scan"
+    assert home != Path.home(), "the scanner HOME is not the server home"
+    allowed = {"PATH", "HOME"} | set(external._PROXY_VARS) | set(external._NO_PROXY_VARS)
     for env in seen_envs:
-        assert set(env) == {"PATH", "HOME"}
+        assert set(env) <= allowed
+        assert "PATH" in env and "HOME" in env
         assert "LAUNCHAUDIT_MARKER_SECRET" not in env
-        assert not Path(env["HOME"]).exists()
+        for name in external._PROXY_VARS:
+            if name in env:
+                assert "@" not in env[name], "proxy credentials must be stripped"
     assert all(homes_existed)
 
 
+def test_strip_proxy_auth() -> None:
+    """Proxy URLs lose their userinfo; the host and port survive."""
+    strip = external._strip_proxy_auth
+    assert strip("http://user:secret@proxy.example.com:3128") == "http://proxy.example.com:3128"
+    assert strip("http://proxy.example.com:8080") == "http://proxy.example.com:8080"
+    assert strip("proxy.example.com:3128") == "http://proxy.example.com:3128"
+    assert strip("http://user:secret@[fd00::1]:3128") == "http://[fd00::1]:3128"
+    assert strip("http://") is None
+    assert strip("") is None
+
+
 def test_run_passes_minimal_env_to_real_subprocess(monkeypatch) -> None:
-    """The real _run path: a child process sees only PATH and HOME.
+    """The real _run path: a child process sees only the allowlisted env.
 
     Uses the `env` binary, which prints exactly the environment it was
     given (a Python child would add LC_CTYPE itself via locale coercion).
@@ -318,5 +340,10 @@ def test_run_passes_minimal_env_to_real_subprocess(monkeypatch) -> None:
     assert not timed_out
     assert code == 0
     child_env = dict(line.split("=", 1) for line in out.splitlines() if "=" in line)
-    assert set(child_env) == {"PATH", "HOME"}
+    allowed = {"PATH", "HOME"} | set(external._PROXY_VARS) | set(external._NO_PROXY_VARS)
+    assert set(child_env) <= allowed
+    assert "PATH" in child_env and "HOME" in child_env
     assert "LAUNCHAUDIT_MARKER_SECRET" not in child_env
+    for name in external._PROXY_VARS:
+        if name in child_env:
+            assert "@" not in child_env[name], "proxy credentials must be stripped"
