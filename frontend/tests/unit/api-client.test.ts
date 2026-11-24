@@ -107,11 +107,15 @@ describe("getHealth", () => {
   });
 
   it("reports caller cancellation as aborted, not timeout", async () => {
-    stubFetch(async (req) => neverResolving(req));
+    const fetchMock = stubFetch(async (req) => neverResolving(req));
     const controller = new AbortController();
     const pending = catchError(
       getHealth({ signal: controller.signal, timeoutMs: 5_000 }),
     );
+    // Wait until the request is in flight before aborting: the auth
+    // middleware yields a microtask before fetch runs, so an immediate
+    // abort can land before the stub attaches its abort listener.
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
     controller.abort();
     const err = await pending;
     expect(err.code).toBe("aborted");

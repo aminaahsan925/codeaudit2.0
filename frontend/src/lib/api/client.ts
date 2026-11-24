@@ -1,6 +1,7 @@
 import createClient from "openapi-fetch";
 
 import { env } from "@/lib/env";
+import { getSessionToken } from "@/lib/session";
 import type { paths } from "@/types/api";
 
 import {
@@ -18,6 +19,20 @@ export const apiClient = createClient<paths>({
   credentials: "omit",
   // Resolve fetch per call so tests and instrumentation can replace it.
   fetch: (request: Request) => globalThis.fetch(request),
+});
+
+/**
+ * Sends the stored session token as Authorization: Bearer when one exists.
+ * Anonymous requests (guest runs, public endpoints) go out without a header.
+ */
+apiClient.use({
+  onRequest({ request }) {
+    const token = getSessionToken();
+    if (token !== null) {
+      request.headers.set("Authorization", `Bearer ${token}`);
+    }
+    return request;
+  },
 });
 
 type FetchResult<TData> = Promise<{
