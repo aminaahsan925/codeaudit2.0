@@ -38,7 +38,7 @@ ALL_SECURITY_HEADERS = [
 CLEAN_HOME = """<html lang="en"><head><title>Demo Shop</title></head><body>
 <img src="/img/logo.png" alt="Demo Shop logo">
 <img src="/img/spacer.png" alt="">
-<form>
+<form action="/" method="post">
 <label for="email">Email</label>
 <input id="email" name="email" type="email">
 <label>Name <input name="name" type="text"></label>
@@ -58,7 +58,7 @@ DIRTY_HOME = """<html><head></head><body>
 <img src="/img/logo.png" alt="Demo Shop logo">
 <img src="/img/hero.jpg">
 <img src="/img/badge.png">
-<form>
+<form action="/" method="post">
 <label for="email">Email</label>
 <input id="email" name="email" type="email">
 <input name="phone" type="tel">
