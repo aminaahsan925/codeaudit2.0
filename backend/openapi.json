@@ -240,18 +240,6 @@
       },
       "Body_create_run_api_runs_post": {
         "properties": {
-          "domain_token": {
-            "anyOf": [
-              {
-                "maxLength": 1024,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Domain Token"
-          },
           "journey_definition": {
             "anyOf": [
               {
@@ -1076,20 +1064,8 @@
         "type": "object"
       },
       "RerunRequest": {
-        "description": "Fresh per-run inputs for a rerun.\n\nJourney credentials are never persisted: a rerun copies only the\nproject name, repo URL and live URL from the original run, so the\ncaller supplies fresh credentials (and a fresh domain token) here.",
+        "description": "Fresh per-run inputs for a rerun.\n\nJourney credentials are never persisted: a rerun copies only the\nproject name, repo URL and live URL from the original run, so the\ncaller supplies fresh credentials here. Domain verification uses\nthe stored server-issued token for the domain and owner; no token\nis accepted from the client.",
         "properties": {
-          "domain_token": {
-            "anyOf": [
-              {
-                "maxLength": 1024,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Domain Token"
-          },
           "journey_email": {
             "anyOf": [
               {
@@ -1289,6 +1265,94 @@
         ],
         "title": "Verdict",
         "type": "string"
+      },
+      "VerificationCheckRequest": {
+        "description": "Ask the server to check the token file for a domain.",
+        "properties": {
+          "domain": {
+            "maxLength": 253,
+            "minLength": 1,
+            "title": "Domain",
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain"
+        ],
+        "title": "VerificationCheckRequest",
+        "type": "object"
+      },
+      "VerificationCheckResponse": {
+        "description": "Whether the domain currently serves its stored token.",
+        "properties": {
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "verified": {
+            "title": "Verified",
+            "type": "boolean"
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified At"
+          }
+        },
+        "required": [
+          "domain",
+          "verified",
+          "verified_at"
+        ],
+        "title": "VerificationCheckResponse",
+        "type": "object"
+      },
+      "VerificationTokenRequest": {
+        "description": "Ask the server to issue a token for a domain.",
+        "properties": {
+          "domain": {
+            "maxLength": 253,
+            "minLength": 1,
+            "title": "Domain",
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain"
+        ],
+        "title": "VerificationTokenRequest",
+        "type": "object"
+      },
+      "VerificationTokenResponse": {
+        "description": "The fresh token and the exact URL it must be served at.",
+        "properties": {
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "verification_url": {
+            "title": "Verification Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain",
+          "token",
+          "verification_url"
+        ],
+        "title": "VerificationTokenResponse",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -2165,6 +2229,118 @@
         "summary": "Re-run an audit after fixes",
         "tags": [
           "runs"
+        ]
+      }
+    },
+    "/api/verification/check": {
+      "post": {
+        "operationId": "check_domain_api_verification_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerificationCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationCheckResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Check a domain verification file",
+        "tags": [
+          "verification"
+        ]
+      }
+    },
+    "/api/verification/token": {
+      "post": {
+        "operationId": "request_token_api_verification_token_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerificationTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationTokenResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Request a domain verification token",
+        "tags": [
+          "verification"
         ]
       }
     }

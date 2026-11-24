@@ -186,13 +186,15 @@ so it appears in history. Rate-limited per token or client IP
 
 Form fields: `project_name` (required), `repo_url` (https github.com URL),
 `live_url`, `zip_file` (a `.zip` upload), `journey_email`,
-`journey_password`, `domain_token`, `journey_definition` (a JSON string:
+`journey_password`, `journey_definition` (a JSON string:
 user-defined journey steps, at most 20; each step is `goto` with a URL,
 `fill` with a selector and value, `click` with a selector, or
 `expect_text` with text; go-to URLs must stay on the live URL origin).
 At least one of `repo_url` or `zip_file` is required. Journey credentials
-are held in memory for the run only and are never stored. Returns `201`
-with the `AuditRun` (`status = queued`).
+are held in memory for the run only and are never stored. Live checks
+use the stored server-issued domain token for the run owner (see
+Domain verification below); no token is accepted from the client.
+Returns `201` with the `AuditRun` (`status = queued`).
 
 ### `GET /api/runs/{run_id}`
 
@@ -206,10 +208,33 @@ Authenticated. Lists runs owned by the caller, newest first.
 
 Creates a new run from a previous run's inputs (project name, repo URL, live
 URL, and the original run's journey definition if it had one; zip reruns
-reuse the stored upload). Accepts fresh journey credentials
-and a fresh domain token in the body. The new run records `previous_run_id`.
+reuse the stored upload). Accepts fresh journey credentials in the body.
+Domain verification reuses the stored server-issued token for the domain
+and owner. The new run records `previous_run_id`.
 Authenticated when the original run was owned, else public by id. Returns
 `201` with the new `AuditRun`.
+
+### Domain verification
+
+Live checks only probe a domain the submitter has proven they own. The
+server issues the token; a client-supplied token is never accepted.
+
+### `POST /api/verification/token`
+
+Body: `{ "domain": "shop.example.com" }`. Issues a fresh random token
+for the domain and returns it with the exact URL it must be served at:
+`https://<domain>/.well-known/launchaudit-verification.txt`. A new request
+for the same domain replaces the old token. Guests may request tokens;
+their tokens are scoped by domain only, while signed-in owners are
+scoped by domain and subject. Local addresses are rejected: loopback
+targets are verified automatically in development. Returns `201`.
+
+### `POST /api/verification/check`
+
+Body: `{ "domain": "shop.example.com" }`. Fetches exactly the
+well-known HTTPS URL and compares its content with the stored token.
+Returns `{ "domain", "verified", "verified_at" }`. A token served at
+any other path, or as a meta tag, does not verify.
 
 ### `GET /api/runs/{run_id}/artifacts/{name}`
 
