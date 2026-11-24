@@ -99,6 +99,29 @@ app is unaffected).
 docker compose up --build
 ```
 
+## Local CLI
+
+Run an audit from the terminal, without the web UI or a database:
+
+```bash
+cd backend
+uv run python -m app.cli run --path ./my-app --live-url https://example.com --confirm-owns-domain
+```
+
+The code scan always runs on `--path` (scanned code is read, never run).
+Live checks and the journey run only when `--live-url` is given together
+with `--confirm-owns-domain`, which is the local equivalent of the web
+domain-verification gate: without the flag they are skipped with a note.
+The journey also needs `--journey-user` and `--journey-pass` (a test
+account); without them it is skipped with a note. `--json <file>` writes
+the full report (verdict, risk score, findings with proof) as JSON.
+
+Exit codes: `0` launch, `1` fix_first or do_not_launch, `2` usage or
+validation error. The CLI runs in memory only: it creates no run row,
+writes no database rows, and deletes its temporary journey screenshots
+when it finishes. AI review is not run locally; the report uses the
+scan, live and journey findings as found.
+
 ## Checks
 
 Run all of these before opening a PR (CI runs the same).
