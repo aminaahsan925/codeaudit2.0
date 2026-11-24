@@ -3,6 +3,7 @@
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
+import { FindingTracking } from "@/components/finding-tracking";
 import { Markdown } from "@/components/markdown";
 import { SeverityBadge } from "@/components/severity-badge";
 import type { Evidence, Finding, HttpEvidence, TraceStep } from "@/lib/api";
@@ -167,12 +168,15 @@ export function FindingCard({
   index,
   runId,
   defaultOpen = false,
+  readOnly = false,
 }: {
   finding: Finding;
   /** 1-based position in the fix-first list. */
   index: number;
   runId: string;
   defaultOpen?: boolean;
+  /** True on the public shared report: assignment shows, but cannot change. */
+  readOnly?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const location = findingLocation(finding);
@@ -200,6 +204,7 @@ export function FindingCard({
               {location}
             </p>
           ) : null}
+          <FindingTracking finding={finding} runId={runId} readOnly={readOnly} />
         </div>
         <button
           type="button"

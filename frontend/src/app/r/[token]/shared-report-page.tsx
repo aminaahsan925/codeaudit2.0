@@ -6,5 +6,5 @@ import { useSharedReport } from "@/hooks/use-report";
 /** The public shared report behind a share token. No account needed. */
 export function SharedReportPage({ token }: { token: string }) {
   const query = useSharedReport(token);
-  return <ReportPageContent query={query} />;
+  return <ReportPageContent query={query} readOnly />;
 }

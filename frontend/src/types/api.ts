@@ -214,6 +214,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/findings/{finding_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Assign a finding and track its fix */
+        patch: operations["update_finding_api_runs__run_id__findings__finding_id__patch"];
+        trace?: never;
+    };
     "/api/runs/{run_id}/report": {
         parameters: {
             query?: never;
@@ -392,6 +409,8 @@ export interface components {
         /** Finding */
         Finding: {
             ai_verdict: components["schemas"]["AIVerdict"] | null;
+            /** Assignee */
+            assignee: string | null;
             category: components["schemas"]["FindingCategory"];
             confidence: components["schemas"]["Confidence"];
             /** Cwe */
@@ -422,6 +441,8 @@ export interface components {
             title: string;
             /** Trace */
             trace: components["schemas"]["TraceStep"][];
+            /** @default open */
+            tracking_status: components["schemas"]["TrackingStatus"];
         };
         /**
          * FindingCategory
@@ -438,6 +459,22 @@ export interface components {
          * @enum {string}
          */
         FindingStatus: "open" | "fixed" | "ignored" | "false_positive";
+        /**
+         * FindingUpdate
+         * @description PATCH body for a finding's assignment and tracking status.
+         *
+         *     Both fields are optional; only the fields present in the request change
+         *     (checked via `model_fields_set`). `tracking_status` stays a plain string
+         *     here so the service can reject an unknown value with a 400 instead of
+         *     FastAPI's 422, and so an over-long assignee gets the same treatment.
+         *     An empty or blank assignee clears the assignment.
+         */
+        FindingUpdate: {
+            /** Assignee */
+            assignee?: string | null;
+            /** Tracking Status */
+            tracking_status?: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -606,6 +643,16 @@ export interface components {
             /** Snippet */
             snippet: string;
         };
+        /**
+         * TrackingStatus
+         * @description Manual fix tracking, separate from the rerun-driven `FindingStatus`.
+         *
+         *     A rerun never flips a manual `fixed` or `ignored` back to `open`; it may
+         *     only auto-mark a finding `fixed` while its tracking status is `open` or
+         *     `in_progress` (see `app.services.runs.runner._finish_run`).
+         * @enum {string}
+         */
+        TrackingStatus: "open" | "in_progress" | "fixed" | "ignored";
         /**
          * UserResponse
          * @description A signed-in user, as the frontend shows them.
@@ -1043,6 +1090,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_finding_api_runs__run_id__findings__finding_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+                finding_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FindingUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Finding"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
