@@ -371,7 +371,17 @@ def _cve_findings_pip_audit(tree: Path, tools_dir: Path | None) -> tuple[list[Fi
     if not req_file.is_file():
         return [], "no requirements.txt found"
     code, out, err, timed_out = _run(
-        [binary, "-r", str(req_file), "--format", "json", "--progress-spinner", "off"],
+        [
+            binary,
+            "-r",
+            str(req_file),
+            "--format",
+            "json",
+            "--progress-spinner",
+            "off",
+            "--no-deps",
+            "--disable-pip",
+        ],
         timeout=CVE_TIMEOUT,
     )
     if timed_out:
