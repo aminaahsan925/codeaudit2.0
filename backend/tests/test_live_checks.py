@@ -19,7 +19,7 @@ ALL_SECURITY_HEADERS = [
     ("Strict-Transport-Security", "max-age=31536000"),
 ]
 
-CLEAN_HOME = "<html><head></head><body>ok</body></html>"
+CLEAN_HOME = '<html lang="en"><head><title>Demo</title></head><body>ok</body></html>'
 
 
 @pytest.fixture
@@ -92,7 +92,8 @@ def test_js_bundle_secret_flagged_and_masked(live_server, loopback_settings):
     live_server.routes["/"] = RouteResponse(
         status=200,
         headers=list(ALL_SECURITY_HEADERS),
-        body='<html><head><script src="/static/app.js"></script></head></html>',
+        body='<html lang="en"><head><title>Demo</title>'
+        '<script src="/static/app.js"></script></head></html>',
     )
     # Fake key-shaped value for the masking test only, never a real key.
     live_server.routes["/static/app.js"] = RouteResponse(
@@ -114,7 +115,8 @@ def test_js_bundle_without_secrets_not_flagged(live_server, loopback_settings):
     live_server.routes["/"] = RouteResponse(
         status=200,
         headers=list(ALL_SECURITY_HEADERS),
-        body='<html><head><script src="/static/app.js"></script></head></html>',
+        body='<html lang="en"><head><title>Demo</title>'
+        '<script src="/static/app.js"></script></head></html>',
     )
     live_server.routes["/static/app.js"] = RouteResponse(status=200, body="console.log('hello');\n")
     findings = run_live_checks(live_server.url, loopback_settings, verified=True)
@@ -125,7 +127,10 @@ def test_cross_origin_bundle_not_fetched(live_server, loopback_settings):
     live_server.routes["/"] = RouteResponse(
         status=200,
         headers=list(ALL_SECURITY_HEADERS),
-        body=('<html><head><script src="https://cdn.example.com/x.js"></script></head></html>'),
+        body=(
+            '<html lang="en"><head><title>Demo</title>'
+            '<script src="https://cdn.example.com/x.js"></script></head></html>'
+        ),
     )
     findings = run_live_checks(live_server.url, loopback_settings, verified=True)
     assert rule_ids(findings) == []
@@ -291,7 +296,9 @@ def test_broken_app_flags_everything(live_server, loopback_settings):
         "EXPOSED_ENV",
         "EXPOSED_GIT",
         "INSECURE_COOKIE",
+        "MISSING_LANG",
         "MISSING_SECURITY_HEADERS",
+        "MISSING_TITLE",
         "OPEN_ADMIN_ROUTE",
         "SECRETS_IN_JS_BUNDLE",
     ]
