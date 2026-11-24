@@ -22,6 +22,8 @@ export type {
   AuditRun,
   AuditRunStatus,
   CreateRunInput,
+  JourneyStepAction,
+  JourneyStepDefinition,
   RerunRequest,
 } from "./runs";
 export {

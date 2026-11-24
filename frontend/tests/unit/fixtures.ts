@@ -22,6 +22,7 @@ export function makeRun(overrides: Partial<AuditRun> = {}): AuditRun {
     share_token: SHARE_TOKEN,
     is_guest: true,
     journey_steps: null,
+    journey_definition: null,
     previous_run_id: null,
     domain_verified: true,
     ...overrides,

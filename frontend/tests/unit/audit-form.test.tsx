@@ -45,6 +45,18 @@ describe("AuditForm", () => {
     expect(screen.getByText(/No account needed/)).toBeVisible();
   });
 
+  it("renders the custom journey section with the default journey info", () => {
+    renderWithQueryClient(<AuditForm />);
+    expect(
+      screen.getByRole("heading", { name: /Custom journey/ }),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        "Default journey: sign up, log in, add to cart, check out.",
+      ),
+    ).toBeVisible();
+  });
+
   it("shows validation errors and does not submit an empty form", async () => {
     const user = userEvent.setup();
     const fetchMock = stubFetch(async () => json(makeRun(), 201));
