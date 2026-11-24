@@ -17,6 +17,8 @@ describe("ReportView", () => {
     expect(screen.getByText("pocket-notes")).toBeVisible();
     expect(screen.getByText("Fix first")).toBeVisible();
     expect(screen.getByText("4.3")).toBeVisible();
+    expect(screen.getByTestId("risk-gauge")).toBeInTheDocument();
+    expect(screen.getByTestId("severity-bar")).toBeInTheDocument();
     // "Critical" appears in the counts strip and on the finding's badge.
     expect(screen.getAllByText("Critical")).toHaveLength(2);
     expect(

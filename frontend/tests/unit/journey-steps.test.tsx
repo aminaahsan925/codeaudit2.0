@@ -38,4 +38,18 @@ describe("JourneySteps", () => {
     );
     expect(screen.queryByAltText("Screenshot of the Log in step")).not.toBeInTheDocument();
   });
+
+  it("draws a timeline rail with a connector between steps, none after the last", () => {
+    const { container } = render(
+      <JourneySteps
+        runId={RUN_ID}
+        steps={[
+          { name: "Sign up", status: "passed", screenshot_url: null, error: null },
+          { name: "Log in", status: "passed", screenshot_url: null, error: null },
+          { name: "Check out", status: "failed", screenshot_url: null, error: null },
+        ]}
+      />,
+    );
+    expect(container.querySelectorAll("li > div > span.w-0\\.5")).toHaveLength(2);
+  });
 });
