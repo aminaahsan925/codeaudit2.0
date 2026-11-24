@@ -1,46 +1,69 @@
 import { ButtonLink } from "@/components/button-link";
+import {
+  GlobeIcon,
+  InjectionIcon,
+  KeyIcon,
+  LockIcon,
+  PackageIcon,
+  ShieldScriptIcon,
+} from "@/components/graphics/check-icons";
+import { HeroIllustration } from "@/components/graphics/hero-illustration";
+import {
+  CodeInIcon,
+  ReportIcon,
+  ScanIcon,
+} from "@/components/graphics/step-icons";
 import { SampleReport } from "@/components/sample-report";
 import { SignInButton } from "@/components/sign-in-button";
 
 const STEPS = [
   {
+    icon: CodeInIcon,
     title: "Add your code",
-    body: "Connect a GitHub repo or upload a zip. LaunchAudit reads the code; it never installs or runs it.",
+    body: "GitHub repo or zip.",
   },
   {
+    icon: ScanIcon,
     title: "Add your live URL",
-    body: "Verify you own the domain, then LaunchAudit checks the running app the way a visitor would.",
+    body: "Verify your domain.",
   },
   {
+    icon: ReportIcon,
     title: "Press Run",
-    body: "Get a Launch Report: a verdict, a 0-10 risk score and every problem with the proof behind it.",
+    body: "Verdict, risk score, proof.",
   },
 ] as const;
 
 const CHECKS = [
   {
+    icon: KeyIcon,
     title: "Leaked secrets",
-    body: "API keys, tokens and passwords committed to the repo or shipped to the browser.",
+    body: "Keys and passwords in code or the browser.",
   },
   {
+    icon: InjectionIcon,
     title: "Injection",
-    body: "User input that reaches a database query, shell command or template, traced step by step.",
+    body: "Input reaching a query, shell or template.",
   },
   {
+    icon: LockIcon,
     title: "Login and access control",
-    body: "Routes that skip sign-in checks, or let one user read or change another user’s data.",
+    body: "Missing sign-in checks, cross-user access.",
   },
   {
+    icon: PackageIcon,
     title: "Vulnerable dependencies",
-    body: "Packages with published security advisories, and the version that fixes them.",
+    body: "Packages with known advisories.",
   },
   {
+    icon: GlobeIcon,
     title: "Live configuration",
-    body: "Missing security headers, open CORS, exposed files and debug pages on your live URL.",
+    body: "Headers, CORS, exposed files, debug pages.",
   },
   {
+    icon: ShieldScriptIcon,
     title: "Request forgery and XSS",
-    body: "User-controlled URLs and HTML that reach places they should not.",
+    body: "Bad URLs and HTML in the wrong place.",
   },
 ] as const;
 
@@ -57,10 +80,10 @@ export default function HomePage() {
               Check your app before you launch it.
             </h1>
             <p className="max-w-prose text-lg text-muted-foreground sm:text-xl">
-              Built your app with AI tools? LaunchAudit reads your code and
-              probes your live URL, then tells you plainly whether it is safe
-              to launch, and shows the proof for every problem it finds.
+              Built your app with AI tools? Get a plain verdict on whether it
+              is safe to launch, with proof for every problem.
             </p>
+            <HeroIllustration className="max-w-md" />
             <div className="flex flex-wrap gap-3 pt-2">
               <ButtonLink href="/audits/new" size="lg">
                 Run an audit
@@ -71,8 +94,7 @@ export default function HomePage() {
             </div>
             <SignInButton />
             <p className="max-w-prose text-sm text-muted-foreground">
-              Your code is read, never executed. Live checks only start after
-              you verify that you own the domain.
+              Your code is read, never run.
             </p>
           </div>
           <SampleReport className="lg:col-span-6 lg:col-start-7 xl:col-span-5 xl:col-start-8" />
@@ -84,16 +106,18 @@ export default function HomePage() {
           <h2 id="how-title" className="text-2xl font-bold tracking-tight sm:text-3xl">
             How an audit works
           </h2>
-          <ol className="mt-8 grid gap-8 md:grid-cols-3 md:gap-10">
-            {STEPS.map((step, index) => (
-              <li key={step.title} className="flex gap-4 md:flex-col md:gap-3">
-                <span
-                  aria-hidden="true"
-                  className="flex size-8 shrink-0 items-center justify-center rounded-md border-2 border-primary font-mono text-sm font-semibold text-primary"
-                >
-                  {index + 1}
+          <ol className="relative mt-8 grid gap-8 md:grid-cols-3 md:gap-10">
+            {/* Dashed flow line behind the step icons on wide screens. */}
+            <div
+              aria-hidden="true"
+              className="absolute inset-x-0 top-6 hidden border-t-2 border-dashed border-input md:block"
+            />
+            {STEPS.map((step) => (
+              <li key={step.title} className="relative flex flex-col gap-3">
+                <span className="flex size-12 items-center justify-center rounded-full border bg-background text-primary">
+                  <step.icon className="size-6" />
                 </span>
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1">
                   <h3 className="text-lg font-semibold">{step.title}</h3>
                   <p className="max-w-prose text-muted-foreground">{step.body}</p>
                 </div>
@@ -104,24 +128,29 @@ export default function HomePage() {
       </section>
 
       <section aria-labelledby="checks-title">
-        <div className="container-page grid gap-8 py-14 sm:py-20 lg:grid-cols-12 lg:gap-10">
-          <div className="flex flex-col gap-3 lg:col-span-4">
+        <div className="container-page py-14 sm:py-20">
+          <div className="flex flex-col gap-3">
             <h2 id="checks-title" className="text-2xl font-bold tracking-tight sm:text-3xl">
               What it looks for
             </h2>
             <p className="max-w-prose text-muted-foreground">
-              The problems that most often slip into apps built quickly, ranked
-              Critical, High, Medium or Low so you know what to fix first.
+              Ranked Critical to Low, so you fix the worst first.
             </p>
           </div>
-          <dl className="grid border-t sm:grid-cols-2 sm:gap-x-10 lg:col-span-8">
+          <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {CHECKS.map((check) => (
-              <div key={check.title} className="flex flex-col gap-1 border-b py-5">
-                <dt className="font-semibold">{check.title}</dt>
-                <dd className="text-muted-foreground">{check.body}</dd>
-              </div>
+              <li
+                key={check.title}
+                className="flex flex-col gap-3 rounded-lg border bg-card p-5"
+              >
+                <check.icon className="size-7 text-primary" />
+                <div className="flex flex-col gap-1">
+                  <h3 className="font-semibold">{check.title}</h3>
+                  <p className="text-sm text-muted-foreground">{check.body}</p>
+                </div>
+              </li>
             ))}
-          </dl>
+          </ul>
         </div>
       </section>
     </>

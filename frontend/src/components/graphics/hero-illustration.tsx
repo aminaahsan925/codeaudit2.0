@@ -11,6 +11,7 @@ export function HeroIllustration({ className }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 480 200"
+      data-testid="hero-illustration"
       aria-hidden="true"
       focusable="false"
       className={cn("h-auto w-full", className)}
