@@ -9,6 +9,8 @@ from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
+from app.schemas.journey import JourneyStepDefinition
+
 
 class AuditRunStatus(StrEnum):
     QUEUED = "queued"
@@ -43,6 +45,9 @@ class AuditRun(BaseModel):
     is_guest: bool = False
     # Journey steps as stored JSON dicts (name, status, screenshot, error).
     journey_steps: list[dict[str, Any]] | None = None
+    # User-defined journey steps to run instead of the default flow.
+    # Null when the run uses the default journey.
+    journey_definition: list[JourneyStepDefinition] | None = None
     previous_run_id: UUID | None = None
     domain_verified: bool = False
 

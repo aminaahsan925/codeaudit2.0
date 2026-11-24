@@ -1,9 +1,11 @@
 """Journey runner: drive a real browser through a shop's core flow.
 
-Steps, in order: "Sign up", "Log in", "Add to cart", "Check out". A
-screenshot is taken at every step that runs. The first failed step produces
-exactly one High journey Finding; later steps are marked skipped and produce
-no findings. A passed journey produces no findings.
+Default steps, in order: "Sign up", "Log in", "Add to cart", "Check out".
+A run with a custom journey definition executes those steps instead, in
+the same result format (each step pass/fail, a screenshot, an error on
+failure). A screenshot is taken at every step that runs. The first failed
+step produces exactly one High journey Finding; later steps are marked
+skipped and produce no findings. A passed journey produces no findings.
 
 The browser is launched with the proxy disabled so localhost targets work
 on machines with a proxy configured. Credentials are never logged.
@@ -17,9 +19,12 @@ browser at a private or metadata address.
 
 from __future__ import annotations
 
+import re
 import time
+from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 from uuid import uuid4
 
@@ -34,6 +39,7 @@ from playwright.sync_api import (
 from playwright.sync_api import (
     TimeoutError as PlaywrightTimeoutError,
 )
+from pydantic import TypeAdapter, ValidationError
 
 from app.core.config import Settings
 from app.schemas.finding import (
@@ -43,6 +49,11 @@ from app.schemas.finding import (
     FindingCategory,
     FindingEngine,
     Severity,
+)
+from app.schemas.journey import (
+    JourneyStepAction,
+    JourneyStepDefinition,
+    resolve_goto_url,
 )
 from app.services.live.ssrf_client import (
     SsrfBlockedError,
@@ -384,6 +395,17 @@ def _step_checkout(page: Page, base_url: str, timeout_ms: int) -> None:
     )
 
 
+# Guidance for a failed custom step, which has no entry in _FIX_GUIDANCE.
+_GENERIC_FIX_GUIDANCE = (
+    "## Why it matters\n\n"
+    "This step of the custom journey could not complete, so a visitor "
+    "following the same path would get stuck here too.\n\n"
+    "## How to fix\n\n"
+    "Walk through the step yourself in a browser: open the page, fill in "
+    "the form, and press the button the step uses. Fix the first error you "
+    "see, then run the journey again to confirm the step passes."
+)
+
 _FIX_GUIDANCE = {
     "Sign up": (
         "## Why it matters\n\n"
@@ -455,7 +477,7 @@ def _finding_for_failure(step_name: str, screenshot: str | None, error: str) -> 
             screenshot_url=screenshot,
             notes=f"Step: {step_name}. {error}",
         ),
-        fix_guidance=_FIX_GUIDANCE[step_name],
+        fix_guidance=_FIX_GUIDANCE.get(step_name, _GENERIC_FIX_GUIDANCE),
     )
 
 
@@ -468,20 +490,150 @@ def _screenshot(page: Page, path: Path) -> str | None:
     return path.name
 
 
+def _custom_step_name(step: JourneyStepDefinition) -> str:
+    """The report name for a custom step: its label, or one from the action."""
+    if step.name:
+        return step.name
+    if step.action is JourneyStepAction.GOTO:
+        path = urlparse(step.url or "").path or step.url or ""
+        return f"Go to {path}"
+    if step.action is JourneyStepAction.FILL:
+        return f"Fill {step.selector}"
+    if step.action is JourneyStepAction.CLICK:
+        return f"Click {step.selector}"
+    return f"Expect text {step.text!r}"
+
+
+def _slugify(text: str) -> str:
+    """A screenshot-safe slug: lowercase alphanumerics and dashes only."""
+    slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    return slug[:40].strip("-") or "step"
+
+
+def _step_custom_goto(
+    page: Page, base_url: str, step: JourneyStepDefinition, timeout_ms: int
+) -> None:
+    try:
+        target = resolve_goto_url(base_url, step.url or "")
+    except ValueError as exc:
+        raise StepFailedError(str(exc)) from exc
+    page.goto(target, timeout=timeout_ms)
+    _wait_loaded(page, timeout_ms)
+
+
+def _step_custom_fill(page: Page, step: JourneyStepDefinition, timeout_ms: int) -> None:
+    try:
+        page.locator(step.selector or "").first.fill(step.value or "", timeout=timeout_ms)
+    except Exception as exc:
+        raise StepFailedError(
+            f"Could not fill {step.selector}: {_first_line(str(exc), limit=200)}"
+        ) from exc
+
+
+def _step_custom_click(page: Page, step: JourneyStepDefinition, timeout_ms: int) -> None:
+    try:
+        page.locator(step.selector or "").first.click(timeout=timeout_ms)
+    except Exception as exc:
+        raise StepFailedError(
+            f"Could not click {step.selector}: {_first_line(str(exc), limit=200)}"
+        ) from exc
+    _wait_loaded(page, timeout_ms)
+
+
+def _step_custom_expect_text(page: Page, step: JourneyStepDefinition, _timeout_ms: int) -> None:
+    # A text check reads the page as it is; no waiting is needed.
+    if (step.text or "").lower() not in _page_text(page).lower():
+        raise StepFailedError(f"Expected text {step.text!r} was not on the page.")
+
+
+def _run_custom_step(
+    page: Page, base_url: str, step: JourneyStepDefinition, timeout_ms: int
+) -> None:
+    """Execute one custom step against the current page."""
+    if step.action is JourneyStepAction.GOTO:
+        _step_custom_goto(page, base_url, step, timeout_ms)
+    elif step.action is JourneyStepAction.FILL:
+        _step_custom_fill(page, step, timeout_ms)
+    elif step.action is JourneyStepAction.CLICK:
+        _step_custom_click(page, step, timeout_ms)
+    else:
+        _step_custom_expect_text(page, step, timeout_ms)
+
+
+# One entry of a journey plan: report name, screenshot filename, executor.
+StepFn = Callable[[Page, int], None]
+StepPlan = list[tuple[str, str, StepFn]]
+
+
+def _default_step_plan(base_url: str, email: str, password: str) -> StepPlan:
+    """The default journey: sign up, log in, add to cart, check out."""
+    step_fns = [
+        lambda page, timeout_ms: _step_signup(page, base_url, email, password, timeout_ms),
+        lambda page, timeout_ms: _step_login(page, base_url, email, password, timeout_ms),
+        lambda page, timeout_ms: _step_add_to_cart(page, base_url, timeout_ms),
+        lambda page, timeout_ms: _step_checkout(page, base_url, timeout_ms),
+    ]
+    return [
+        (name, filename, fn)
+        for name, filename, fn in zip(STEP_NAMES, STEP_SCREENSHOTS, step_fns, strict=True)
+    ]
+
+
+def _custom_step_plan(base_url: str, steps: list[JourneyStepDefinition]) -> StepPlan:
+    """A plan for a custom journey definition, in the same result format."""
+    plan: StepPlan = []
+    for index, step in enumerate(steps):
+        name = _custom_step_name(step)[:80]
+        filename = f"step-{index + 1:02d}-{_slugify(name)}.png"
+        plan.append(
+            (
+                name,
+                filename,
+                lambda page, timeout_ms, bound_step=step: _run_custom_step(
+                    page, base_url, bound_step, timeout_ms
+                ),
+            )
+        )
+    return plan
+
+
+def _coerce_definition(
+    journey_definition: list[JourneyStepDefinition] | list[dict[str, Any]] | None,
+) -> list[JourneyStepDefinition] | None:
+    """Normalise a stored definition (dicts) into step models.
+
+    Raises ValueError when a stored step no longer validates; the caller
+    treats that like any other journey failure.
+    """
+    if not journey_definition:
+        return None
+    if all(isinstance(step, JourneyStepDefinition) for step in journey_definition):
+        return list(journey_definition)  # type: ignore[arg-type]
+    try:
+        return TypeAdapter(list[JourneyStepDefinition]).validate_python(journey_definition)
+    except ValidationError as exc:
+        raise ValueError(f"The stored journey definition is invalid: {exc}") from exc
+
+
 def run_journey(
     base_url: str,
     credentials: JourneyCredentials,
     artifact_dir: str | Path,
     settings: Settings,
+    journey_definition: list[JourneyStepDefinition] | list[dict[str, Any]] | None = None,
 ) -> JourneyResult:
     """Run the sign up, log in, add to cart, check out flow in Chromium.
 
+    With a custom journey definition, those steps run instead, in the same
+    result format (each step pass/fail, a screenshot, an error on failure).
     Screenshots land in artifact_dir as step-01-signup.png ..
-    step-04-checkout.png. Each step gets at most 15s and the whole run at
-    most 120s. On a failed step the journey stops, later steps are marked
+    step-04-checkout.png for the default journey, or step-NN-<slug>.png for
+    custom steps. Each step gets at most 15s and the whole run at most
+    120s. On a failed step the journey stops, later steps are marked
     skipped, and exactly one High Finding is produced for the failed step.
     """
     _check_target_allowed(base_url, settings)
+    custom_steps = _coerce_definition(journey_definition)
     out_path = Path(artifact_dir)
     out_path.mkdir(parents=True, exist_ok=True)
     base_url = base_url.rstrip("/")
@@ -492,20 +644,16 @@ def run_journey(
     findings: list[Finding] = []
     started = time.monotonic()
 
-    step_fns = [
-        lambda page, timeout_ms: _step_signup(page, base_url, email, password, timeout_ms),
-        lambda page, timeout_ms: _step_login(page, base_url, email, password, timeout_ms),
-        lambda page, timeout_ms: _step_add_to_cart(page, base_url, timeout_ms),
-        lambda page, timeout_ms: _step_checkout(page, base_url, timeout_ms),
-    ]
+    if custom_steps:
+        plan = _custom_step_plan(base_url, custom_steps)
+    else:
+        plan = _default_step_plan(base_url, email, password)
 
     with sync_playwright() as p:
         browser = _launch(p)
         try:
             page = _guarded_page(browser, settings)
-            for index, (name, filename, fn) in enumerate(
-                zip(STEP_NAMES, STEP_SCREENSHOTS, step_fns, strict=True)
-            ):
+            for index, (name, filename, fn) in enumerate(plan):
                 remaining_ms = TOTAL_TIMEOUT_MS - (time.monotonic() - started) * 1000
                 if remaining_ms <= 0:
                     error = "Journey exceeded the 120s total timeout before this step ran."
@@ -549,7 +697,7 @@ def run_journey(
                     if status == JourneyStepStatus.FAILED and error is not None:
                         findings.append(_finding_for_failure(name, screenshot, error))
                 if steps[-1].status == JourneyStepStatus.FAILED:
-                    for later_name in STEP_NAMES[index + 1 :]:
+                    for later_name, _, _ in plan[index + 1 :]:
                         steps.append(
                             JourneyStep(
                                 name=later_name,

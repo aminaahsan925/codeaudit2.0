@@ -41,6 +41,7 @@ from app.core.ratelimit import enforce_audit_rate_limit
 from app.repositories.audit_runs import AuditRunRepository
 from app.schemas.audit_run import AuditRun
 from app.schemas.error import error_responses
+from app.schemas.journey import MAX_JOURNEY_DEFINITION_CHARS, parse_journey_definition
 from app.schemas.run_create import RerunRequest
 from app.services.runs import execute_run, validate_github_url
 
@@ -93,6 +94,7 @@ async def create_run(
     journey_email: Annotated[str | None, Form(max_length=320)] = None,
     journey_password: Annotated[str | None, Form(max_length=1024)] = None,
     domain_token: Annotated[str | None, Form(max_length=1024)] = None,
+    journey_definition: Annotated[str | None, Form(max_length=MAX_JOURNEY_DEFINITION_CHARS)] = None,
 ) -> AuditRun:
     if repo_url is None and zip_file is None:
         raise AppError("Provide a GitHub repo URL or upload a zip file.")
@@ -101,6 +103,12 @@ async def create_run(
     if zip_file is not None and not (zip_file.filename or "").lower().endswith(".zip"):
         raise AppError("The uploaded file must be a .zip file.")
     _check_journey_credentials(journey_email, journey_password)
+    try:
+        steps = parse_journey_definition(
+            journey_definition, str(live_url) if live_url is not None else None
+        )
+    except ValueError as exc:
+        raise AppError(str(exc)) from exc
     # Rate limit after validation, so bad requests do not consume quota.
     enforce_audit_rate_limit(request, settings, _rate_limit_token(principal, credentials))
 
@@ -112,6 +120,7 @@ async def create_run(
         live_url=live_url,
         share_token=secrets.token_urlsafe(32),
         is_guest=principal is None,
+        journey_definition=steps,
     )
     created = AuditRunRepository(session).create(
         run, owner=principal.subject if principal is not None else None
@@ -185,6 +194,8 @@ async def rerun_run(
         share_token=secrets.token_urlsafe(32),
         is_guest=original.is_guest,
         previous_run_id=original.id,
+        # A rerun repeats the same journey as the original run.
+        journey_definition=original.journey_definition,
     )
     owner = principal.subject if principal is not None and not original.is_guest else None
     created = AuditRunRepository(session).create(new_run, owner=owner)
