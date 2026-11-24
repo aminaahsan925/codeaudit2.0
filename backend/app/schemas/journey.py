@@ -120,10 +120,16 @@ def _check_goto_same_origin(steps: list[JourneyStepDefinition], live_url: str) -
 
 
 def _first_validation_message(exc: ValidationError) -> str:
-    """The first Pydantic error as 'Step N: <message>'."""
+    """The first Pydantic error as 'Step N: <message>'.
+
+    Pydantic prefixes validator errors with 'Value error, '; that prefix
+    is stripped so the message reads as written for the API caller.
+    """
     error = exc.errors()[0]
     loc = error.get("loc", ())
     message = error.get("msg", "Invalid journey step.")
+    if message.startswith("Value error, "):
+        message = message[len("Value error, ") :]
     if loc and isinstance(loc[0], int):
         return f"Step {loc[0] + 1}: {message}"
     return message
