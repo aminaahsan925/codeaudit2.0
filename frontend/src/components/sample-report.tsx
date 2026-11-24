@@ -1,40 +1,14 @@
 import { RiskScore } from "@/components/risk-score";
-import { SeverityBadge } from "@/components/severity-badge";
+import { SampleFindings } from "@/components/sample-findings";
 import { VerdictBadge } from "@/components/verdict-badge";
-import { VERDICT_SUMMARY, type Severity } from "@/lib/report";
+import { VERDICT_SUMMARY } from "@/lib/report";
+import { SAMPLE_FINDINGS } from "@/lib/sample-report";
 import { cn } from "@/lib/utils";
 
-interface SampleFinding {
-  severity: Severity;
-  title: string;
-  proofKind: string;
-  proof: string;
-}
-
-const SAMPLE_FINDINGS: readonly SampleFinding[] = [
-  {
-    severity: "critical",
-    title: "Database admin key is shipped to the browser",
-    proofKind: "src/lib/db.ts, line 4",
-    proof: 'const adminKey = "sk_live_••••";',
-  },
-  {
-    severity: "high",
-    title: "Any signed-in user can read other users’ notes",
-    proofKind: "Live request as a second test user",
-    proof: "GET /api/notes/1042  200 OK",
-  },
-  {
-    severity: "medium",
-    title: "Pages are served without a Content-Security-Policy",
-    proofKind: "Response headers from the live URL",
-    proof: "content-security-policy: (missing)",
-  },
-];
-
 /**
- * A static, clearly labelled example of a Launch Report built from the real
- * badge components. It is illustration only: no data is fetched.
+ * A clearly labelled example of a Launch Report built from the real report
+ * components. Findings open to show their proof. Illustration only: no data
+ * is fetched.
  */
 export function SampleReport({ className }: { className?: string }) {
   return (
@@ -72,29 +46,11 @@ export function SampleReport({ className }: { className?: string }) {
           </div>
         </dl>
 
-        <div className="px-5 pt-4 pb-5">
-          <p className="mb-3 text-sm text-muted-foreground">
-            3 findings, each with its proof
+        <div className="px-5 pt-4 pb-4">
+          <p className="mb-2 text-sm text-muted-foreground">
+            {SAMPLE_FINDINGS.length} findings. Open one to see its proof.
           </p>
-          <ul className="flex flex-col divide-y">
-            {SAMPLE_FINDINGS.map((finding) => (
-              <li
-                key={finding.title}
-                className="grid gap-x-3 gap-y-1.5 py-3 first:pt-0 last:pb-0 sm:grid-cols-[5.75rem_1fr]"
-              >
-                <div>
-                  <SeverityBadge severity={finding.severity} />
-                </div>
-                <div className="flex min-w-0 flex-col gap-1.5">
-                  <p className="text-sm leading-snug font-semibold">{finding.title}</p>
-                  <p className="text-xs text-muted-foreground">{finding.proofKind}</p>
-                  <code className="block overflow-x-auto rounded-sm bg-muted px-2 py-1.5 font-mono text-xs whitespace-pre">
-                    {finding.proof}
-                  </code>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <SampleFindings />
         </div>
       </div>
       <figcaption

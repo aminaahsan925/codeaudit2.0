@@ -38,7 +38,10 @@ describe("HomePage", () => {
 
   it("shows the audit as a visual three-step flow with icons", () => {
     const { container } = render(<HomePage />);
-    const steps = container.querySelector("ol");
+    // Scope to the how section: the sample report also renders an <ol>
+    // (the proof trace of the first finding).
+    const section = container.querySelector('section[aria-labelledby="how-title"]');
+    const steps = section?.querySelector("ol");
     const items = steps ? within(steps).getAllByRole("listitem") : [];
     expect(items).toHaveLength(3);
     for (const item of items) {
