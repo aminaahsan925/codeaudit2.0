@@ -81,6 +81,10 @@ def extract_zip(zip_path: Path, target: Path) -> None:
 
     Rejects absolute paths and ".." members, caps the total uncompressed
     size at 50 MiB and the file count at 2000. Symlink members are skipped.
+    Members under .git/ are skipped too: a malicious .git can carry hooks
+    and git config that execute when a scanner runs git in the extracted
+    tree, so uploads never bring one along. (Cloned repos keep their full
+    .git: the history scan needs it. See clone_repo.)
     """
     if not zip_path.is_file():
         raise CodeInputError("The uploaded code is no longer available.")
@@ -97,6 +101,11 @@ def extract_zip(zip_path: Path, target: Path) -> None:
             if member.is_dir() or _is_symlink_member(member):
                 continue
             name = member.filename
+            # A .git member (a file or dir whose first path part is .git)
+            # is dropped before any other check: hooks and config in a
+            # smuggled .git must never reach the extracted tree.
+            if Path(name).parts and Path(name).parts[0] == ".git":
+                continue
             if name.startswith(("/", "\\")) or ".." in Path(name).parts:
                 raise CodeInputError("The zip file contains unsafe paths.")
             file_count += 1
