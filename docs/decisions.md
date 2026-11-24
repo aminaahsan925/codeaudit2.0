@@ -219,6 +219,25 @@ Google configuration.
   user's email (`is_guest = false`); the dev stub owns as `dev`; no token
   means a guest run, unchanged.
 
+## Visual home and report UI (Nov 2026)
+
+The home page and report went visual-first: more graphics, less text.
+The home page has a hero illustration (magnifier over code, shield
+verdict), a three-step icon flow and six icon cards for the check
+categories, each with one short line. The report shows the risk score as
+a semicircle gauge dial coloured by verdict band, a stacked severity bar
+under the counts strip, and the journey as a connected timeline.
+
+- **Inline SVG only**: all graphics are components under
+  `frontend/src/components/graphics/`, no stock photos, no external
+  images, no emoji icons. Colours come from the existing design tokens
+  (Tailwind `fill-*`/`stroke-*` classes), so graphics follow light and
+  dark mode with no new colours and no new fonts.
+- **Graphics are decorative**: every illustration is `aria-hidden`; the
+  number, label or heading beside it carries the meaning. The gauge
+  bands match the backend verdict thresholds (launch at 2.0 and below,
+  fix first up to 5.0, do not launch above).
+
 ## Security review fixes (Nov 2026)
 
 A read-only security review of the Launchpad build found four issues, fixed
