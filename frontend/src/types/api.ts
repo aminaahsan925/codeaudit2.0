@@ -303,6 +303,8 @@ export interface components {
              * @default false
              */
             is_guest: boolean;
+            /** Journey Definition */
+            journey_definition: components["schemas"]["JourneyStepDefinition"][] | null;
             /** Journey Steps */
             journey_steps: {
                 [key: string]: unknown;
@@ -339,6 +341,8 @@ export interface components {
         Body_create_run_api_runs_post: {
             /** Domain Token */
             domain_token?: string | null;
+            /** Journey Definition */
+            journey_definition?: string | null;
             /** Journey Email */
             journey_email?: string | null;
             /** Journey Password */
@@ -471,6 +475,33 @@ export interface components {
             status: number;
             /** Url */
             url: string;
+        };
+        /**
+         * JourneyStepAction
+         * @enum {string}
+         */
+        JourneyStepAction: "goto" | "fill" | "click" | "expect_text";
+        /**
+         * JourneyStepDefinition
+         * @description One user-defined journey step.
+         *
+         *     Which fields apply depends on the action: goto needs `url`, fill needs
+         *     `selector` and `value`, click needs `selector`, expect_text needs
+         *     `text`. `name` is an optional label shown in the report; without one
+         *     the runner derives a name from the action.
+         */
+        JourneyStepDefinition: {
+            action: components["schemas"]["JourneyStepAction"];
+            /** Name */
+            name?: string | null;
+            /** Selector */
+            selector?: string | null;
+            /** Text */
+            text?: string | null;
+            /** Url */
+            url?: string | null;
+            /** Value */
+            value?: string | null;
         };
         /**
          * JourneyStepView

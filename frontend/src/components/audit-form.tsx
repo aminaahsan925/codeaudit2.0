@@ -4,11 +4,13 @@ import { TriangleAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, type ChangeEvent, type FormEvent } from "react";
 
+import { CustomJourneyForm } from "@/components/journey-form";
 import { Button } from "@/components/ui/button";
 import { useCreateRun } from "@/hooks/use-run";
 import { isApiError, type CreateRunInput } from "@/lib/api";
 import {
   EMPTY_AUDIT_FORM,
+  toJourneyDefinition,
   validateAuditForm,
   type AuditFormErrors,
   type AuditFormValues,
@@ -78,6 +80,7 @@ export function AuditForm() {
       journeyEmail: values.journeyEmail || undefined,
       journeyPassword: values.journeyPassword || undefined,
       domainToken: values.domainToken || undefined,
+      journeyDefinition: toJourneyDefinition(values.journeySteps),
     };
     // Await the mutation instead of relying on a per-call onSuccess:
     // TanStack Query drops per-call callbacks when the observer loses its
@@ -279,6 +282,23 @@ export function AuditForm() {
             <FieldError message={errors.journeyPassword} id="journey-password-error" />
           </div>
         </div>
+      </section>
+
+      <section aria-labelledby="custom-journey-heading" className="flex flex-col gap-4">
+        <h2 id="custom-journey-heading" className="text-xl font-semibold tracking-tight">
+          Custom journey <span className="text-base font-normal text-muted-foreground">(optional)</span>
+        </h2>
+        <p className="-mt-2 max-w-prose text-sm text-muted-foreground">
+          Walk a flow of your own, such as a password reset: go to a page,
+          fill a field, click a button, expect text. Leave it empty to run
+          the default journey.
+        </p>
+        <CustomJourneyForm
+          steps={values.journeySteps}
+          onChange={(steps) => setValue("journeySteps", steps)}
+          disabled={submitting}
+          error={errors.journeySteps}
+        />
       </section>
 
       {apiError ? (

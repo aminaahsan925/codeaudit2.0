@@ -72,6 +72,20 @@
             "title": "Is Guest",
             "type": "boolean"
           },
+          "journey_definition": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/JourneyStepDefinition"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Journey Definition"
+          },
           "journey_steps": {
             "anyOf": [
               {
@@ -206,6 +220,7 @@
           "share_token",
           "is_guest",
           "journey_steps",
+          "journey_definition",
           "previous_run_id",
           "domain_verified"
         ],
@@ -236,6 +251,18 @@
               }
             ],
             "title": "Domain Token"
+          },
+          "journey_definition": {
+            "anyOf": [
+              {
+                "maxLength": 32768,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Journey Definition"
           },
           "journey_email": {
             "anyOf": [
@@ -698,6 +725,89 @@
           "body_excerpt"
         ],
         "title": "HttpEvidence",
+        "type": "object"
+      },
+      "JourneyStepAction": {
+        "enum": [
+          "goto",
+          "fill",
+          "click",
+          "expect_text"
+        ],
+        "title": "JourneyStepAction",
+        "type": "string"
+      },
+      "JourneyStepDefinition": {
+        "description": "One user-defined journey step.\n\nWhich fields apply depends on the action: goto needs `url`, fill needs\n`selector` and `value`, click needs `selector`, expect_text needs\n`text`. `name` is an optional label shown in the report; without one\nthe runner derives a name from the action.",
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/JourneyStepAction"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "selector": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selector"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "maxLength": 2083,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "JourneyStepDefinition",
         "type": "object"
       },
       "JourneyStepView": {

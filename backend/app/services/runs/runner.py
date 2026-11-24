@@ -215,6 +215,7 @@ def _journey_stage(
             JourneyCredentials(email=journey_email, password=journey_password),
             artifact_dir,
             settings,
+            journey_definition=run.journey_definition,
         )
     except JourneyTargetBlockedError:
         logger.info("Run %s: journey skipped (target blocked).", run.id)

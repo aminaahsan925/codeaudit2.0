@@ -170,6 +170,7 @@ One problem found by any engine, with the evidence that proves it.
 | `share_token` | string \| null | Unguessable token for the public share link |
 | `is_guest` | boolean | True when the run was created without a bearer token |
 | `journey_steps` | object[] \| null | Stored journey steps (`name`, `status`, `screenshot`, `error`) |
+| `journey_definition` | object[] \| null | User-defined journey steps to run instead of the default flow (`action`, `url`, `selector`, `value`, `text`, `name`); null means the default journey |
 | `previous_run_id` | uuid \| null | The run this one reran, if any |
 | `domain_verified` | boolean | Whether the live URL's domain was verified for this run |
 
@@ -185,9 +186,13 @@ so it appears in history. Rate-limited per token or client IP
 
 Form fields: `project_name` (required), `repo_url` (https github.com URL),
 `live_url`, `zip_file` (a `.zip` upload), `journey_email`,
-`journey_password`, `domain_token`. At least one of `repo_url` or `zip_file`
-is required. Journey credentials are held in memory for the run only and are
-never stored. Returns `201` with the `AuditRun` (`status = queued`).
+`journey_password`, `domain_token`, `journey_definition` (a JSON string:
+user-defined journey steps, at most 20; each step is `goto` with a URL,
+`fill` with a selector and value, `click` with a selector, or
+`expect_text` with text; go-to URLs must stay on the live URL origin).
+At least one of `repo_url` or `zip_file` is required. Journey credentials
+are held in memory for the run only and are never stored. Returns `201`
+with the `AuditRun` (`status = queued`).
 
 ### `GET /api/runs/{run_id}`
 
@@ -200,7 +205,8 @@ Authenticated. Lists runs owned by the caller, newest first.
 ### `POST /api/runs/{run_id}/rerun`
 
 Creates a new run from a previous run's inputs (project name, repo URL, live
-URL; zip reruns reuse the stored upload). Accepts fresh journey credentials
+URL, and the original run's journey definition if it had one; zip reruns
+reuse the stored upload). Accepts fresh journey credentials
 and a fresh domain token in the body. The new run records `previous_run_id`.
 Authenticated when the original run was owned, else public by id. Returns
 `201` with the new `AuditRun`.

@@ -37,6 +37,10 @@ class AuditRunModel(Base):
     # Journey steps as run: [{name, status, screenshot, error}]. Null when
     # no journey ran (no live URL, no credentials, or the journey was skipped).
     journey_steps: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
+    # User-defined journey steps to run instead of the default flow:
+    # [{action, url?, selector?, value?, text?, name?}]. Null when the run
+    # uses the default journey (sign up, log in, add to cart, check out).
+    journey_definition: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
     # The run this one re-audits (fix-and-verify rerun). No cascade: deleting
     # the previous run must not delete its reruns.
     previous_run_id: Mapped[UUID | None] = mapped_column(
