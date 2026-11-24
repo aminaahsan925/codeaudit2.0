@@ -13,6 +13,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -85,24 +86,35 @@ def find_tool(name: str, tools_dir: Path | None = None) -> str | None:
 def _run(
     command: list[str], timeout: int, cwd: Path | None = None
 ) -> tuple[int | None, str, str, bool]:
-    """Run a scanner. Returns (returncode, stdout, stderr, timed_out)."""
-    try:
-        # The command is a resolved tool binary plus fixed flags; the
-        # scanned tree path is one argument, never a shell command
-        # (shell=False), so it cannot inject anything.
-        proc = subprocess.run(  # noqa: S603
-            command,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            cwd=cwd,
-            shell=False,
-        )
-        return proc.returncode, proc.stdout, proc.stderr, False
-    except subprocess.TimeoutExpired:
-        return None, "", "timed out", True
-    except OSError as exc:
-        return None, "", str(exc), False
+    """Run a scanner. Returns (returncode, stdout, stderr, timed_out).
+
+    The scanner gets a minimal env (PATH and HOME only): it scans
+    untrusted code, so no server secret may leak into its process.
+    HOME is a fresh temp dir per call, removed when the scanner exits,
+    so a scanner can neither read the server's home (git config,
+    credentials) nor write anything there.
+    """
+    # A fresh HOME per call, removed when the scanner exits.
+    with tempfile.TemporaryDirectory(prefix="launchaudit-scanner-") as home:
+        env = {"PATH": os.environ.get("PATH", ""), "HOME": home}
+        try:
+            # The command is a resolved tool binary plus fixed flags; the
+            # scanned tree path is one argument, never a shell command
+            # (shell=False), so it cannot inject anything.
+            proc = subprocess.run(  # noqa: S603
+                command,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                cwd=cwd,
+                shell=False,
+                env=env,
+            )
+            return proc.returncode, proc.stdout, proc.stderr, False
+        except subprocess.TimeoutExpired:
+            return None, "", "timed out", True
+        except OSError as exc:
+            return None, "", str(exc), False
 
 
 def _detect_frameworks(tree: Path) -> set[str]:
