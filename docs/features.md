@@ -16,3 +16,4 @@ the same PR that changes it.
 | 8 | Review and fix suggestions | LLM review (Gemini, Groq fallback, rule-based fallback) that confirms findings and proposes fixes; every claim must quote code | Done |
 | 9 | Fix-and-verify rerun | Re-run the affected checks after a fix and mark findings fixed | Done |
 | 10 | Shareable report and PDF | Read-only shareable report link and PDF export | Done |
+| 11 | Google sign-in | Google OAuth2 login with signed sessions; demo sign-in fallback while Google is unconfigured; runs owned by the signed-in user's email | Done |

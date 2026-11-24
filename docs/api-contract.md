@@ -44,14 +44,72 @@ Public liveness check. Does not touch the database.
 
 ### `GET /api/auth/me`
 
-Auth stub. Returns `401 unauthorized` without a valid bearer token. In
-development a single token from `API_AUTH_TOKEN` is accepted (compared in
-constant time); if it is unset, every request is rejected. Real auth replaces
-this later.
+Returns the signed-in user; see the auth endpoints below.
+
+## Endpoints (auth)
+
+Sign-in is optional: guests can run audits without a token. When Google is
+configured, users sign in with Google; otherwise the backend offers a
+clearly-labelled demo sign-in. See `google-signin-setup.md` for the Google
+Cloud setup steps.
+
+### `GET /api/auth/providers`
+
+Public. Reports which sign-in options are available:
 
 ```json
-{ "subject": "dev" }
+{ "google": true, "demo": false }
 ```
+
+`google` is true when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are
+both set; `demo` is true when they are not.
+
+### `GET /api/auth/google/login`
+
+Redirects (302) to Google's OAuth2 authorization endpoint with
+`response_type=code`, `scope=openid email profile`, and a signed `state`
+token (10-minute expiry). Returns `404` when Google is not configured or
+sessions cannot be issued (`SESSION_SECRET` unset or shorter than 32
+characters).
+
+### `GET /api/auth/google/callback`
+
+Google redirects back here with `code` and `state`. Validates the state,
+exchanges the code at Google's token endpoint, verifies the ID token via
+Google's tokeninfo endpoint (audience, expiry, verified email), upserts the
+user by `google_sub`, issues a session token (30-day expiry), and redirects
+(302) to `{FRONTEND_URL}/auth/callback?token=<session token>`. Returns `400`
+with a generic message on any failure; no Google error detail is exposed.
+
+### `POST /api/auth/demo-login`
+
+Only available while Google is NOT configured (otherwise `404`). Creates or
+reuses the local demo user (`demo@launchaudit.local`, "Demo User") and
+returns a session:
+
+```json
+{ "token": "<session token>", "demo": true, "user": { "...": "..." } }
+```
+
+The response and every UI surface label this as demo; it is never presented
+as Google sign-in.
+
+### `POST /api/auth/logout`
+
+No server state to clear (sessions are signed tokens); the frontend
+discards its token. Returns `{ "signed_out": true }`.
+
+### `GET /api/auth/me`
+
+Returns the signed-in user, or `401 unauthorized` when anonymous:
+
+```json
+{ "subject": "amina@example.com", "email": "amina@example.com", "name": "Amina", "picture_url": null, "demo": false }
+```
+
+`subject` is the owner's key: the user's email for a session token, `dev`
+for the dev token stub (development and test only; never accepted in
+production).
 
 ## Domain schemas
 
@@ -121,7 +179,8 @@ One problem found by any engine, with the evidence that proves it.
 
 Multipart form. Creates an audit run and starts the pipeline in the
 background. Guest runs need no token; a valid bearer token marks the run
-owned (`dev`) so it appears in history. Rate-limited per token or client IP
+owned (the user's email for a session token, `dev` for the dev token stub)
+so it appears in history. Rate-limited per token or client IP
 (`audit_rate_limit_per_hour`, default 10).
 
 Form fields: `project_name` (required), `repo_url` (https github.com URL),
@@ -136,7 +195,7 @@ Public by id. Returns the `AuditRun` with current `status` and `progress`.
 
 ### `GET /api/runs`
 
-Authenticated. Lists runs owned by `dev`, newest first.
+Authenticated. Lists runs owned by the caller, newest first.
 
 ### `POST /api/runs/{run_id}/rerun`
 

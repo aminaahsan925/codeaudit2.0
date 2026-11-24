@@ -186,6 +186,39 @@ All feature work landed on the local integration branch
 - **Native engine**: the built-in scan rules use engine `native`, distinct
   from `semgrep`/`gitleaks`/`osv` tool findings.
 
+## Google sign-in (Nov 2026)
+
+Feature 11, on branch `feat/google-signin`. Sign-in is optional: guests
+keep running audits exactly as before, and the app runs fully without any
+Google configuration.
+
+- **Google OAuth2 code flow**: `GET /auth/google/login` redirects to Google
+  with a signed `state` token (HS256, 10-minute expiry); the callback swaps
+  the code, verifies the ID token via Google's tokeninfo endpoint
+  (audience, expiry, verified email), upserts the user by `google_sub`,
+  and issues a signed session token (HS256, 30-day expiry) that the
+  frontend stores in localStorage. No Google OAuth client exists yet; the
+  setup steps are in `docs/google-signin-setup.md`.
+- **Fail-closed sessions**: `SESSION_SECRET` must be at least 32
+  characters, the same rule as `API_AUTH_TOKEN`. Unset or short means no
+  sessions can be issued (login and demo login return 404). Google
+  credentials are all optional; blank values count as unset.
+- **Demo sign-in**: while Google is unconfigured, `POST /auth/demo-login`
+  signs in a local demo user (`demo@launchaudit.local`). It is labelled
+  demo in the API response (`demo: true`), the button text, and the header,
+  and is disabled (404) as soon as Google is configured.
+- **Tokeninfo, not JWKS**: the ID token is verified against Google's
+  tokeninfo endpoint rather than a local JWKS check, keeping the
+  verification path to one HTTP call with no key-caching logic. Tokeninfo
+  answers are treated as data: only `aud`, `exp`, `email_verified`, `sub`,
+  `email`, `name` and `picture` are read.
+- **The dev token stub stays**: `API_AUTH_TOKEN` still authenticates as
+  `dev` in development and test, and is still rejected in production.
+  Session tokens authenticate in every environment, including production.
+- **Run ownership**: a run created with a session token is owned by the
+  user's email (`is_guest = false`); the dev stub owns as `dev`; no token
+  means a guest run, unchanged.
+
 ## Security review fixes (Nov 2026)
 
 A read-only security review of the Launchpad build found four issues, fixed
