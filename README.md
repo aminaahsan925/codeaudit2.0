@@ -3,7 +3,7 @@
 LaunchAudit audits AI-built web apps before and after launch. Add your code (a
 GitHub repo or a zip) and the live URL, press **Run**, and get a **Launch
 Report**: a verdict (Launch / Fix first / Do not launch), a 0-10 risk score, and
-every problem with proof — file, line, snippet, data-flow trace, HTTP evidence
+every problem with proof: file, line, snippet, data-flow trace, HTTP evidence
 or a screenshot.
 
 > Status: project foundation. See [docs/features.md](docs/features.md) for the
