@@ -13,6 +13,7 @@ import {
   ReportIcon,
   ScanIcon,
 } from "@/components/graphics/step-icons";
+import { HeroMark } from "@/components/hero-mark";
 import { SampleReport } from "@/components/sample-report";
 import { SignInButton } from "@/components/sign-in-button";
 
@@ -73,6 +74,7 @@ export default function HomePage() {
       <section aria-labelledby="hero-title" className="border-b">
         <div className="container-page grid gap-12 py-12 sm:py-16 lg:grid-cols-12 lg:gap-10 lg:py-24">
           <div className="flex flex-col gap-6 lg:col-span-6 lg:pt-6">
+            <HeroMark className="size-12" />
             <h1
               id="hero-title"
               className="text-4xl font-bold tracking-[-0.035em] text-balance sm:text-5xl"
