@@ -1,9 +1,13 @@
-"""Fetch the code a run scans: a shallow GitHub clone or a zip upload.
+"""Fetch the code a run scans: a GitHub clone or a zip upload.
 
 Scanned code is read, never run, never imported. Clones use an argument
 list (never a shell) with a timeout, and zip extraction guards against
 path traversal and zip bombs (same limits as PORTING-NOTES.md: max 50 MiB
 total, max 2000 files).
+
+Clones fetch the FULL history of the default branch (--single-branch, no
+--depth): the history scan must see secrets left in old commits, not just
+the latest checkout. A shallow clone would hide them.
 
 Every failure here raises `CodeInputError` with a message that is safe to
 show the user: no stack traces, no git stderr, no internals.
@@ -43,13 +47,17 @@ def validate_github_url(repo_url: str) -> tuple[str, str] | None:
 
 
 def clone_repo(repo_url: str, target: Path, *, timeout: int = CLONE_TIMEOUT_SECONDS) -> None:
-    """Shallow-clone a validated GitHub URL into `target` (must not exist)."""
+    """Clone a validated GitHub URL into `target` (must not exist).
+
+    Full history of the default branch: the history scan needs old
+    commits, so no --depth. --single-branch keeps other branches out.
+    """
     git = shutil.which("git")
     if git is None:
         raise CodeInputError("Git is not available on this server.")
     try:
         proc = subprocess.run(  # noqa: S603 - arg list, URL validated to github.com
-            [git, "clone", "--depth", "1", repo_url, str(target)],
+            [git, "clone", "--single-branch", repo_url, str(target)],
             timeout=timeout,
             capture_output=True,
             text=True,
