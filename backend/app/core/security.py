@@ -7,10 +7,14 @@ streaming bodies and do not buffer responses.
 from __future__ import annotations
 
 import hmac
+import secrets
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import Final
+from uuid import UUID
 
+import jwt
 from pydantic import SecretStr
 from starlette.datastructures import Headers, MutableHeaders
 from starlette.exceptions import HTTPException
@@ -225,9 +229,19 @@ def mask_secret(value: str | None, *, visible: int = 4) -> str:
 
 @dataclass(frozen=True, slots=True)
 class Principal:
-    """Identity attached to an authenticated request."""
+    """Identity attached to an authenticated request.
+
+    `subject` is the owner key for audit runs: the user's email for a session
+    sign-in, `"dev"` for the development token stub. The user fields are only
+    set for session sign-ins.
+    """
 
     subject: str
+    user_id: UUID | None = None
+    email: str | None = None
+    name: str | None = None
+    picture_url: str | None = None
+    demo: bool = False
 
 
 def verify_bearer_token(provided: str | None, expected: SecretStr | None) -> bool:
@@ -241,3 +255,108 @@ def verify_bearer_token(provided: str | None, expected: SecretStr | None) -> boo
     if not expected_value:
         return False
     return hmac.compare_digest(provided.encode("utf-8"), expected_value.encode("utf-8"))
+
+
+# ----------------------------------------------------------------- session tokens
+
+SESSION_ISSUER: Final = "launchaudit"
+SESSION_TOKEN_EXPIRY_DAYS: Final = 30
+OAUTH_STATE_EXPIRY_MINUTES: Final = 10
+_OAUTH_STATE_PURPOSE: Final = "oauth-state"
+
+
+@dataclass(frozen=True, slots=True)
+class SessionClaims:
+    """The identity a verified session token carries."""
+
+    user_id: UUID
+    email: str
+    name: str | None
+    picture_url: str | None
+    demo: bool
+
+
+def issue_session_token(
+    secret: str,
+    *,
+    user_id: UUID,
+    email: str,
+    name: str | None,
+    picture_url: str | None,
+    demo: bool,
+    expires_in_days: int = SESSION_TOKEN_EXPIRY_DAYS,
+) -> str:
+    """Sign a session token (HS256) for a signed-in user."""
+    now = datetime.now(UTC)
+    payload = {
+        "iss": SESSION_ISSUER,
+        "sub": str(user_id),
+        "email": email,
+        "name": name,
+        "picture_url": picture_url,
+        "demo": demo,
+        "iat": now,
+        "exp": now + timedelta(days=expires_in_days),
+    }
+    return jwt.encode(payload, secret, algorithm="HS256")
+
+
+def verify_session_token(token: str, secret: str) -> SessionClaims | None:
+    """Verify a session token. Returns None for any bad, expired or alien token."""
+    try:
+        payload = jwt.decode(
+            token,
+            secret,
+            algorithms=["HS256"],
+            issuer=SESSION_ISSUER,
+            options={"require": ["exp", "iat", "iss", "sub"]},
+        )
+    except jwt.PyJWTError:
+        return None
+    try:
+        user_id = UUID(str(payload["sub"]))
+        email = payload["email"]
+        name = payload.get("name")
+        picture_url = payload.get("picture_url")
+        demo = payload.get("demo", False)
+    except (KeyError, ValueError, TypeError, AttributeError):
+        return None
+    if (
+        not isinstance(email, str)
+        or not email
+        or (name is not None and not isinstance(name, str))
+        or (picture_url is not None and not isinstance(picture_url, str))
+        or not isinstance(demo, bool)
+    ):
+        return None
+    return SessionClaims(
+        user_id=user_id, email=email, name=name, picture_url=picture_url, demo=demo
+    )
+
+
+def issue_oauth_state(secret: str, *, expires_in_minutes: int = OAUTH_STATE_EXPIRY_MINUTES) -> str:
+    """Sign a short-lived OAuth `state` value (CSRF protection for the login flow)."""
+    now = datetime.now(UTC)
+    payload = {
+        "iss": SESSION_ISSUER,
+        "purpose": _OAUTH_STATE_PURPOSE,
+        "nonce": secrets.token_hex(16),
+        "iat": now,
+        "exp": now + timedelta(minutes=expires_in_minutes),
+    }
+    return jwt.encode(payload, secret, algorithm="HS256")
+
+
+def verify_oauth_state(state: str, secret: str) -> bool:
+    """True when `state` is a live state token we issued."""
+    try:
+        payload = jwt.decode(
+            state,
+            secret,
+            algorithms=["HS256"],
+            issuer=SESSION_ISSUER,
+            options={"require": ["exp", "iat", "iss"]},
+        )
+    except jwt.PyJWTError:
+        return False
+    return payload.get("purpose") == _OAUTH_STATE_PURPOSE
