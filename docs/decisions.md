@@ -267,6 +267,48 @@ before the demo:
   and reads at most 5 MB, so a malicious target cannot exhaust server
   memory with a huge body.
 
+## Security hardening (Nov 2026)
+
+A second review found five more issues, fixed on `feat/security-hardening`:
+
+- **Zip uploads strip `.git`, scanners get a minimal env**: a malicious
+  `.git` in an upload could carry hooks and git config that execute when
+  a scanner runs git in the tree, so `extract_zip` now skips every member
+  under `.git/`. Scanner subprocesses run with only `PATH` and `HOME`
+  (a fresh temp dir per call), so no server secret leaks into a scanner.
+  Trade-off: gitleaks history findings now fire only for GitHub-clone
+  runs, never for zip uploads.
+- **pip-audit runs with `--no-deps --disable-pip`**: without the flags it
+  resolves and can install the scanned project's packages. The flags
+  match the existing parser, which already skips transitive dependencies.
+- **Domain verification is server-generated, well-known URL only**: the
+  token used to be client-supplied, so the check proved nothing about
+  the requester. The server now issues a random token per domain and
+  owner (`POST /api/verification/token`), stored server-side, and the
+  check (`POST /api/verification/check`) fetches exactly
+  `https://<host>/.well-known/launchaudit-verification.txt` over HTTPS
+  through the SSRF-safe client and compares with the stored token. The
+  token file is re-fetched at run time, so removing the file unverifies
+  the domain. The meta-tag path is removed: a tag can be injected
+  through user content, a file needs host access. Verification is
+  HTTPS-only, so plain-HTTP sites cannot verify. The loopback demo path
+  is unchanged: local targets still verify with no token when loopback
+  checks are allowed. Guest tokens are scoped by domain only, since
+  guests have no identity.
+- **Runs, reports, artifacts and reruns check the owner**: a signed-in
+  user's run, report, artifacts, rerun and finding updates are
+  accessible only to that user (no token gets 401, a non-owner gets 404
+  so the run's existence stays hidden). Shared reports stay public only
+  via their share token, and artifacts accept `?token=<share_token>` so
+  screenshots keep loading on shared reports. Guest runs stay open by
+  run id: there is no guest identity to check against.
+- **Homepage files restored**: merge 638d544 deleted `hero-mark.tsx`,
+  `sample-findings.tsx`, `sample-report.ts` and its test from the branch
+  line. They are restored verbatim from `origin/main` and wired back
+  into the graphics UI (mark above the headline, findings inside the
+  sample report card) without replacing the hero illustration, icon
+  cards or gauge dial.
+
 ## Known risks (accepted for the judges-only demo)
 
 - **DNS-rebinding TOCTOU (live client)**: validation resolves the hostname
@@ -278,10 +320,11 @@ before the demo:
   semi-trusted guests; before any open public demo, either pin the
   validated IP or put the backend behind an egress proxy that only
   permits public destinations.
-- **Guest reruns are public by run id**: anyone who learns a run id can
-  rerun it and flip the original run's finding statuses. Documented
-  behavior for the demo; when real auth lands, reruns must check the
-  run's owner (or require the share token for guest runs).
+- **Guest runs are public by run id**: anyone who learns a guest run id
+  can read it, rerun it and flip its finding statuses. Owned runs now
+  check the owner (see Security hardening above); guest runs have no
+  identity to check against, so they stay open. Requiring the share
+  token for guest runs would close this.
 - **No retention sweep**: uploaded zips and screenshots are kept
   indefinitely under `artifact_dir`. Add a retention job before a
   long-running deployment.
