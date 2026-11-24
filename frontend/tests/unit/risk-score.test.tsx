@@ -24,19 +24,21 @@ describe("RiskScore", () => {
     expect(formatRiskScore(score)).toBe(expected);
   });
 
-  it("hides the decorative gauge from assistive tech and fills proportionally", () => {
-    const { container } = render(<RiskScore score={5} />);
-    const gauge = container.querySelector('[aria-hidden="true"].w-full');
-    expect(gauge).not.toBeNull();
-    const fill = gauge!.querySelector<HTMLElement>(".absolute");
-    expect(fill!.style.width).toBe("50%");
+  it("shows the decorative gauge dial under the number", () => {
+    render(<RiskScore score={5} />);
+    const gauge = screen.getByTestId("risk-gauge");
+    expect(gauge).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByTestId("risk-gauge-arc")).toHaveAttribute(
+      "stroke-dasharray",
+      "50 100",
+    );
   });
 
-  it("clamps the gauge fill for out-of-range scores", () => {
-    const { container } = render(<RiskScore score={99} />);
-    const fill = container.querySelector<HTMLElement>(
-      '[aria-hidden="true"].w-full .absolute',
+  it("clamps the gauge for out-of-range scores", () => {
+    render(<RiskScore score={99} />);
+    expect(screen.getByTestId("risk-gauge-arc")).toHaveAttribute(
+      "stroke-dasharray",
+      "100 100",
     );
-    expect(fill!.style.width).toBe("100%");
   });
 });
