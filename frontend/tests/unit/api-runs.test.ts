@@ -73,7 +73,6 @@ describe("createRun", () => {
       zipFile: zip,
       journeyEmail: "tester@example.com",
       journeyPassword: "hunter2",
-      domainToken: "verify-me",
     });
 
     const req = fetchMock.mock.calls[0]![0];
@@ -84,8 +83,7 @@ describe("createRun", () => {
     expect(body).toContain("tester@example.com");
     expect(body).toContain('name="journey_password"');
     expect(body).toContain("hunter2");
-    expect(body).toContain('name="domain_token"');
-    expect(body).toContain("verify-me");
+    expect(body).not.toContain('name="domain_token"');
     expect(body).not.toContain('name="repo_url"');
   });
 
@@ -95,12 +93,10 @@ describe("createRun", () => {
       projectName: "pocket-notes",
       repoUrl: "https://github.com/example/pocket-notes",
       liveUrl: "   ",
-      domainToken: "",
     });
 
     const body = await fetchMock.mock.calls[0]![0].text();
     expect(body).not.toContain('name="live_url"');
-    expect(body).not.toContain('name="domain_token"');
   });
 
   it("surfaces a 429 rate limit as an ApiError", async () => {
@@ -161,13 +157,11 @@ describe("rerunRun", () => {
     await rerunRun(RUN_ID, {
       journey_email: "tester@example.com",
       journey_password: "hunter2",
-      domain_token: null,
     });
     const req = fetchMock.mock.calls[0]![0];
     expect(await req.json()).toEqual({
       journey_email: "tester@example.com",
       journey_password: "hunter2",
-      domain_token: null,
     });
   });
 });

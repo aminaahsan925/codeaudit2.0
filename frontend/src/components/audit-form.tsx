@@ -38,9 +38,11 @@ function formatFileSize(bytes: number): string {
 }
 
 /**
- * The new-audit form: project name, code (GitHub repo or zip), live URL,
- * journey login and domain token. Submitting starts the run and moves to
- * the run page. No account is needed; the run is reachable from its link.
+ * The new-audit form: project name, code (GitHub repo or zip), live URL
+ * and journey login. Submitting starts the run and moves to the run page.
+ * No account is needed; the run is reachable from its link. Domain
+ * verification uses a server-issued token (see the live section below),
+ * never a token typed here.
  */
 export function AuditForm() {
   const router = useRouter();
@@ -79,7 +81,6 @@ export function AuditForm() {
       zipFile: values.zipFile,
       journeyEmail: values.journeyEmail || undefined,
       journeyPassword: values.journeyPassword || undefined,
-      domainToken: values.domainToken || undefined,
       journeyDefinition: toJourneyDefinition(values.journeySteps),
     };
     // Await the mutation instead of relying on a per-call onSuccess:
@@ -206,31 +207,11 @@ export function AuditForm() {
           </p>
           <FieldError message={errors.liveUrl} id="live-url-error" />
         </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="domain-token" className={labelClasses}>
-            Domain verification token
-          </label>
-          <input
-            id="domain-token"
-            type="text"
-            autoComplete="off"
-            value={values.domainToken}
-            onChange={(event) => setValue("domainToken", event.target.value)}
-            aria-invalid={Boolean(errors.domainToken)}
-            aria-describedby={
-              errors.domainToken ? "domain-token-error" : "domain-token-help"
-            }
-            disabled={submitting}
-            className={cn(inputClasses, "font-mono text-[0.85rem]")}
-          />
-          <p id="domain-token-help" className="text-xs text-muted-foreground">
-            Pick any token and publish it on your site first: a file at
-            /.well-known/launchaudit-verification.txt, or a meta tag named
-            launchaudit-verification on your home page. Without it, live checks
-            are skipped.
-          </p>
-          <FieldError message={errors.domainToken} id="domain-token-error" />
-        </div>
+        <p className="-mt-1 text-xs text-muted-foreground">
+          To verify a domain, request a token (POST /api/verification/token),
+          serve it at the well-known URL in the response, then confirm it
+          (POST /api/verification/check). Without it, live checks are skipped.
+        </p>
       </section>
 
       <section aria-labelledby="journey-heading" className="flex flex-col gap-4">

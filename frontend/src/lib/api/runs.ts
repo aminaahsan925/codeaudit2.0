@@ -19,7 +19,6 @@ export interface CreateRunInput {
   zipFile?: File | null;
   journeyEmail?: string;
   journeyPassword?: string;
-  domainToken?: string;
   /**
    * User-defined journey steps to run instead of the default flow.
    * Sent as a JSON string in the `journey_definition` form part.
@@ -47,7 +46,6 @@ export async function createRun(
   appendIfPresent(form, "live_url", input.liveUrl);
   appendIfPresent(form, "journey_email", input.journeyEmail);
   appendIfPresent(form, "journey_password", input.journeyPassword);
-  appendIfPresent(form, "domain_token", input.domainToken);
   if (input.journeyDefinition && input.journeyDefinition.length > 0) {
     form.append("journey_definition", JSON.stringify(input.journeyDefinition));
   }
@@ -82,9 +80,9 @@ export async function getRun(
 
 /**
  * POST /api/runs/{run_id}/rerun: re-run an audit after fixes. Guest runs
- * rerun without a token. Journey credentials and the domain token are never
- * persisted, so pass fresh ones in `payload` when the rerun should repeat
- * the journey or the live checks.
+ * rerun without a token. Journey credentials are never persisted, so pass
+ * fresh ones in `payload` when the rerun should repeat the journey.
+ * Domain verification reuses the stored server-issued token.
  */
 export async function rerunRun(
   runId: string,

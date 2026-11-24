@@ -61,7 +61,6 @@ export const auditFormSchema = z
     zipFile: z.instanceof(File).nullable(),
     journeyEmail: z.string().trim(),
     journeyPassword: z.string(),
-    domainToken: z.string().trim(),
     journeySteps: z.array(journeyStepFormSchema),
   })
   .superRefine((value, ctx) => {
@@ -129,13 +128,6 @@ export const auditFormSchema = z
         code: "custom",
         path: ["journeyEmail"],
         message: "Enter a valid email address.",
-      });
-    }
-    if (value.domainToken.length > 1024) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["domainToken"],
-        message: "The domain token must be 1024 characters or fewer.",
       });
     }
     if (value.journeySteps.length > MAX_JOURNEY_STEPS) {
@@ -220,7 +212,6 @@ export const EMPTY_AUDIT_FORM: AuditFormValues = {
   zipFile: null,
   journeyEmail: "",
   journeyPassword: "",
-  domainToken: "",
   journeySteps: [],
 };
 
