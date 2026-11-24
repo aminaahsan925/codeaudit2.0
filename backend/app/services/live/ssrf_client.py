@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import ipaddress
 import socket
+import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin, urlparse
 
@@ -49,6 +51,21 @@ class SsrfBlockedError(ValueError):
 
 class TooManyRedirectsError(RuntimeError):
     """Raised when a request exceeds the redirect limit."""
+
+
+@dataclass
+class TimedResponse:
+    """A fetched response plus how long it took to arrive.
+
+    `ttfb_ms` is the time from sending the request until the response
+    headers arrived; `load_ms` is the time until the whole body was
+    downloaded. Both cover only the final hop after redirects: they
+    measure the page itself, not the redirect chain in front of it.
+    """
+
+    response: httpx.Response
+    ttfb_ms: float
+    load_ms: float
 
 
 def loopback_allowed(settings: Settings) -> bool:
@@ -181,6 +198,33 @@ class SsrfSafeClient:
     ) -> httpx.Response:
         return self.request("GET", url, headers=headers, follow_redirects=follow_redirects)
 
+    def get_timed(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        follow_redirects: bool = True,
+    ) -> TimedResponse:
+        """GET a URL and time it, with the same validation and redirect
+        handling as `request`. The timings cover only the final hop: a
+        redirect chain is followed first, then the page itself is timed.
+        """
+        assert_url_allowed(url, allow_loopback=self._allow_loopback)
+        timed = self._fetch_timed("GET", url, headers=headers)
+        redirects = 0
+        while (
+            follow_redirects
+            and timed.response.status_code in _REDIRECT_STATUSES
+            and "location" in timed.response.headers
+        ):
+            if redirects >= MAX_REDIRECTS:
+                raise TooManyRedirectsError(f"stopped after {MAX_REDIRECTS} redirects from {url}")
+            next_url = urljoin(str(timed.response.url), timed.response.headers["location"])
+            assert_url_allowed(next_url, allow_loopback=self._allow_loopback)
+            timed = self._fetch_timed("GET", next_url, headers=headers)
+            redirects += 1
+        return timed
+
     def post(
         self,
         url: str,
@@ -193,6 +237,43 @@ class SsrfSafeClient:
             "POST", url, headers=headers, data=data, follow_redirects=follow_redirects
         )
 
+    def _fetch_timed(
+        self,
+        method: str,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        data: dict[str, str] | None = None,
+    ) -> TimedResponse:
+        """Fetch one URL with timing, reading at most MAX_BODY_BYTES.
+
+        The returned response keeps the real status code, headers, and
+        request, so redirect handling works on it exactly as before; only
+        the body is truncated when the target sends more than the cap.
+        TTFB is measured when the response headers arrive (entering the
+        stream); load time when the body has been fully read.
+        """
+        start = time.monotonic()
+        with self._client.stream(method, url, headers=headers, data=data) as response:
+            ttfb_ms = (time.monotonic() - start) * 1000
+            body = bytearray()
+            for chunk in response.iter_bytes(chunk_size=65536):
+                remaining = MAX_BODY_BYTES - len(body)
+                if remaining <= 0:
+                    break
+                body += chunk[:remaining]
+            load_ms = (time.monotonic() - start) * 1000
+            return TimedResponse(
+                response=httpx.Response(
+                    response.status_code,
+                    headers=response.headers,
+                    content=bytes(body),
+                    request=response.request,
+                ),
+                ttfb_ms=ttfb_ms,
+                load_ms=load_ms,
+            )
+
     def _fetch(
         self,
         method: str,
@@ -201,25 +282,8 @@ class SsrfSafeClient:
         headers: dict[str, str] | None = None,
         data: dict[str, str] | None = None,
     ) -> httpx.Response:
-        """Fetch one URL, reading at most MAX_BODY_BYTES of the response.
-
-        The returned response keeps the real status code, headers, and
-        request, so redirect handling works on it exactly as before; only
-        the body is truncated when the target sends more than the cap.
-        """
-        with self._client.stream(method, url, headers=headers, data=data) as response:
-            body = bytearray()
-            for chunk in response.iter_bytes(chunk_size=65536):
-                remaining = MAX_BODY_BYTES - len(body)
-                if remaining <= 0:
-                    break
-                body += chunk[:remaining]
-            return httpx.Response(
-                response.status_code,
-                headers=response.headers,
-                content=bytes(body),
-                request=response.request,
-            )
+        """Fetch one URL, reading at most MAX_BODY_BYTES of the response."""
+        return self._fetch_timed(method, url, headers=headers, data=data).response
 
     def request(
         self,
