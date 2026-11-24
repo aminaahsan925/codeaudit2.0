@@ -27,6 +27,7 @@ from app.schemas.finding import (
     Severity,
 )
 
+from .crawl import check_broken_links_and_forms
 from .perf_a11y import check_speed_a11y
 from .ssrf_client import SsrfBlockedError, SsrfSafeClient
 
@@ -547,10 +548,10 @@ def run_all_checks(
     email: str | None = None,
     password: str | None = None,
 ) -> CheckOutcome:
-    """Run the live checks (security, speed, and accessibility). Raises
-    LiveAppUnreachableError when the home page cannot be fetched;
-    individual check failures are recorded as skipped in the returned
-    outcome.
+    """Run the nine live checks (security, speed, accessibility, links and
+    forms). Raises LiveAppUnreachableError when the home page cannot be
+    fetched; individual check failures are recorded as skipped in the
+    returned outcome.
     """
     base_url = base_url.rstrip("/")
     try:
@@ -585,4 +586,5 @@ def run_all_checks(
     # Speed and accessibility quick checks (perf_a11y.py): one timed fetch
     # plus a parse of the home page already fetched above.
     _run("SPEED_A11Y", check_speed_a11y, client, base_url, home)
+    _run("BROKEN_LINKS_AND_FORMS", check_broken_links_and_forms, client, base_url, home)
     return outcome
