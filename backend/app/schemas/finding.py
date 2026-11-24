@@ -63,6 +63,23 @@ class FindingStatus(StrEnum):
     FALSE_POSITIVE = "false_positive"
 
 
+class TrackingStatus(StrEnum):
+    """Manual fix tracking, separate from the rerun-driven `FindingStatus`.
+
+    A rerun never flips a manual `fixed` or `ignored` back to `open`; it may
+    only auto-mark a finding `fixed` while its tracking status is `open` or
+    `in_progress` (see `app.services.runs.runner._finish_run`).
+    """
+
+    OPEN = "open"
+    IN_PROGRESS = "in_progress"
+    FIXED = "fixed"
+    IGNORED = "ignored"
+
+
+MAX_ASSIGNEE_LENGTH = 200
+
+
 class TraceStep(BaseModel):
     """One step of a data-flow trace from source to sink."""
 
@@ -131,6 +148,8 @@ class Finding(BaseModel):
     ai_verdict: AIVerdict | None = None
     fix_guidance: str | None = None
     status: FindingStatus = FindingStatus.OPEN
+    assignee: str | None = Field(default=None, max_length=MAX_ASSIGNEE_LENGTH)
+    tracking_status: TrackingStatus = TrackingStatus.OPEN
 
     @model_validator(mode="after")
     def _check_line_range(self) -> "Finding":
@@ -141,3 +160,17 @@ class Finding(BaseModel):
         ):
             raise ValueError("end_line must be greater than or equal to start_line")
         return self
+
+
+class FindingUpdate(BaseModel):
+    """PATCH body for a finding's assignment and tracking status.
+
+    Both fields are optional; only the fields present in the request change
+    (checked via `model_fields_set`). `tracking_status` stays a plain string
+    here so the service can reject an unknown value with a 400 instead of
+    FastAPI's 422, and so an over-long assignee gets the same treatment.
+    An empty or blank assignee clears the assignment.
+    """
+
+    assignee: str | None = None
+    tracking_status: str | None = None
