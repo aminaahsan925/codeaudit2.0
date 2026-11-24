@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 
+import { AuthControls } from "@/components/auth-controls";
 import { HealthBadge } from "@/components/health-badge";
 import { MainNav } from "@/components/main-nav";
 import { MobileNav } from "@/components/mobile-nav";
@@ -27,6 +28,7 @@ export function SiteHeader() {
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           <HealthBadge />
           <ThemeToggle />
+          <AuthControls />
           <Suspense
             fallback={<div aria-hidden="true" className="size-9 md:hidden" />}
           >
