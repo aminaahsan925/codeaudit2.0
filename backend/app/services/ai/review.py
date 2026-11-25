@@ -31,7 +31,7 @@ from app.schemas.finding import AIVerdict, AIVerdictLabel, Finding
 
 from .rules import MAX_SNIPPET, rule_based_review
 
-GEMINI_MODEL = "gemini-2.0-flash"
+GEMINI_MODEL = "gemini-3.8-flash"
 GEMINI_URL = (
     f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 )
