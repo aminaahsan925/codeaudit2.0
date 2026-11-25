@@ -10,7 +10,9 @@ document describes intent, the OpenAPI schema is the machine-readable truth.
 - JSON only, `snake_case` fields, timestamps in ISO 8601 UTC (`2026-11-23T18:00:00Z`).
 - IDs are UUID v4 strings.
 - Request bodies larger than `MAX_REQUEST_BYTES` (default 10 MB) are rejected with `413`.
-- Authenticated endpoints expect `Authorization: Bearer <token>`.
+- Authenticated endpoints accept a session token as an `Authorization: Bearer`
+  header or as the HttpOnly `launchaudit_session` cookie the browser sends
+  with every call (`credentials: include`).
 
 ### Error format
 
@@ -23,7 +25,7 @@ Every non-2xx response has this shape. No stack traces or internal details are e
 | HTTP | `code` | When |
 |---|---|---|
 | 400 | `bad_request` | Malformed request |
-| 401 | `unauthorized` | Missing or invalid bearer token |
+| 401 | `unauthorized` | Missing or invalid session token |
 | 403 | `forbidden` | Authenticated but not allowed |
 | 404 | `not_found` | Unknown route or resource |
 | 405 | `method_not_allowed` | Wrong HTTP method |
@@ -75,29 +77,32 @@ characters).
 ### `GET /api/auth/google/callback`
 
 Google redirects back here with `code` and `state`. Validates the state,
-exchanges the code at Google's token endpoint, verifies the ID token via
-Google's tokeninfo endpoint (audience, expiry, verified email), upserts the
-user by `google_sub`, issues a session token (30-day expiry), and redirects
-(302) to `{FRONTEND_URL}/auth/callback?token=<session token>`. Returns `400`
-with a generic message on any failure; no Google error detail is exposed.
+exchanges the code at Google's token endpoint, verifies the ID token
+locally against Google's signing keys (RS256 signature, audience, issuer,
+expiry, verified email), upserts the user by `google_sub`, issues a session
+token (30-day expiry) as an HttpOnly cookie, and redirects (302) to
+`{FRONTEND_URL}/auth/callback`. The token never appears in the URL. Returns
+`400` with a generic message on any failure; no Google error detail is
+exposed.
 
 ### `POST /api/auth/demo-login`
 
 Only available while Google is NOT configured (otherwise `404`). Creates or
 reuses the local demo user (`demo@launchaudit.local`, "Demo User") and
-returns a session:
+returns it:
 
 ```json
-{ "token": "<session token>", "demo": true, "user": { "...": "..." } }
+{ "demo": true, "user": { "...": "..." } }
 ```
 
-The response and every UI surface label this as demo; it is never presented
-as Google sign-in.
+The session token is set as an HttpOnly cookie on the response, never in
+the body. The response and every UI surface label this as demo; it is never
+presented as Google sign-in.
 
 ### `POST /api/auth/logout`
 
-No server state to clear (sessions are signed tokens); the frontend
-discards its token. Returns `{ "signed_out": true }`.
+Expires the session cookie. The token itself is stateless, so there is
+nothing else to clear server-side. Returns `{ "signed_out": true }`.
 
 ### `GET /api/auth/me`
 
@@ -168,7 +173,7 @@ One problem found by any engine, with the evidence that proves it.
 | `finished_at` | datetime \| null | |
 | `error` | string \| null | Safe, user-facing message when `status = failed` |
 | `share_token` | string \| null | Unguessable token for the public share link |
-| `is_guest` | boolean | True when the run was created without a bearer token |
+| `is_guest` | boolean | True when the run was created without a session token |
 | `journey_steps` | object[] \| null | Stored journey steps (`name`, `status`, `screenshot`, `error`) |
 | `previous_run_id` | uuid \| null | The run this one reran, if any |
 | `domain_verified` | boolean | Whether the live URL's domain was verified for this run |
@@ -178,7 +183,7 @@ One problem found by any engine, with the evidence that proves it.
 ### `POST /api/runs`
 
 Multipart form. Creates an audit run and starts the pipeline in the
-background. Guest runs need no token; a valid bearer token marks the run
+background. Guest runs need no token; a valid session token marks the run
 owned (the user's email for a session token, `dev` for the dev token stub)
 so it appears in history. Rate-limited per token or client IP
 (`audit_rate_limit_per_hour`, default 10).
@@ -226,5 +231,5 @@ Public. Returns the `ReportResponse` for the run with that share token.
 
 ### `GET /api/runs/{run_id}/report.pdf`
 
-Returns the Launch Report as a PDF download. Requires a valid bearer token
+Returns the Launch Report as a PDF download. Requires a valid session token
 or a matching `?token=<share_token>` query parameter (`401` otherwise).

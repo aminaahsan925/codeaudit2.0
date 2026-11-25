@@ -50,7 +50,9 @@ Two related variables:
 
 - `SESSION_SECRET`: a random string of at least 32 characters. Sessions
   cannot be issued without it (Google login and demo login both return
-  404). Generate one with, for example,
+  404). In production, Google configured without `SESSION_SECRET` is a
+  startup error, so a deploy can never silently offer no sign-in. Generate
+  one with, for example,
   `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
 - `FRONTEND_URL`: where the backend redirects after a successful Google
   login. Default `http://localhost:3000`; in production set it to the
@@ -70,10 +72,13 @@ Two related variables:
 - `GET /auth/google/login` redirects to Google with a signed `state` token
   (10-minute expiry, prevents login CSRF).
 - `GET /auth/google/callback` swaps the code for tokens, verifies the ID
-  token against Google's tokeninfo endpoint (audience, expiry, verified
-  email), creates or updates the user by Google subject id, and issues a
-  signed session token (HS256, 30-day expiry).
-- The frontend stores the session token in localStorage and sends it as
-  `Authorization: Bearer` on API calls. Signing out discards it.
+  token locally against Google's signing keys (RS256 signature, audience,
+  issuer, expiry, verified email), creates or updates the user by Google
+  subject id, and issues a signed session token (HS256, 30-day expiry) as
+  an HttpOnly cookie.
+- The session token travels as an HttpOnly cookie, never in a URL or in
+  JavaScript storage: the browser sends it with every API call, and
+  signing out expires it. The API still accepts the same token as an
+  `Authorization: Bearer` header for API clients.
 - Demo sign-in is only offered while Google is unconfigured, and is
   labelled demo everywhere. It never pretends to be Google sign-in.

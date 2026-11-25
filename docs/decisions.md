@@ -194,24 +194,39 @@ Google configuration.
 
 - **Google OAuth2 code flow**: `GET /auth/google/login` redirects to Google
   with a signed `state` token (HS256, 10-minute expiry); the callback swaps
-  the code, verifies the ID token via Google's tokeninfo endpoint
-  (audience, expiry, verified email), upserts the user by `google_sub`,
-  and issues a signed session token (HS256, 30-day expiry) that the
-  frontend stores in localStorage. No Google OAuth client exists yet; the
-  setup steps are in `docs/google-signin-setup.md`.
+  the code, verifies the ID token locally against Google's signing keys
+  (RS256, audience, issuer, expiry, verified email), upserts the user by
+  `google_sub`, and issues a signed session token (HS256, 30-day expiry) as
+  an HttpOnly cookie. No Google OAuth client exists yet; the setup steps
+  are in `docs/google-signin-setup.md`.
 - **Fail-closed sessions**: `SESSION_SECRET` must be at least 32
   characters, the same rule as `API_AUTH_TOKEN`. Unset or short means no
-  sessions can be issued (login and demo login return 404). Google
-  credentials are all optional; blank values count as unset.
+  sessions can be issued (login and demo login return 404). In production,
+  Google configured without `SESSION_SECRET` is a startup error, so a
+  deploy can never silently offer no sign-in. Google credentials are all
+  optional; blank values count as unset.
+- **Sessions are HttpOnly cookies, not localStorage**: the callback sets
+  the token as an HttpOnly cookie (SameSite=Lax in development and test,
+  where frontend and API are same-site on localhost; SameSite=None with
+  Secure in production, where the frontend on Vercel and the API on Render
+  are cross-site). The token never appears in a URL or in JavaScript
+  storage, so it cannot leak into history, logs or Referer headers and an
+  XSS cannot steal it. The API still accepts the same token as an
+  `Authorization: Bearer` header for API clients, and CORS allows
+  credentials for configured origins.
 - **Demo sign-in**: while Google is unconfigured, `POST /auth/demo-login`
   signs in a local demo user (`demo@launchaudit.local`). It is labelled
   demo in the API response (`demo: true`), the button text, and the header,
   and is disabled (404) as soon as Google is configured.
-- **Tokeninfo, not JWKS**: the ID token is verified against Google's
-  tokeninfo endpoint rather than a local JWKS check, keeping the
-  verification path to one HTTP call with no key-caching logic. Tokeninfo
-  answers are treated as data: only `aud`, `exp`, `email_verified`, `sub`,
-  `email`, `name` and `picture` are read.
+- **JWKS, not tokeninfo**: the ID token is verified locally with PyJWT
+  against Google's published signing keys, fetched fresh for each
+  sign-in, instead of Google's tokeninfo debugging endpoint. This keeps
+  the token off the wire entirely and needs no key-caching logic. This
+  replaced the earlier tokeninfo decision after a security review.
+- **Atomic user upsert**: sign-in upserts the user with one
+  INSERT ... ON CONFLICT statement (on `google_sub`, and on `email` for
+  the demo user), so two sign-ins for a new account racing each other
+  create exactly one row instead of failing with IntegrityError.
 - **The dev token stub stays**: `API_AUTH_TOKEN` still authenticates as
   `dev` in development and test, and is still rejected in production.
   Session tokens authenticate in every environment, including production.
