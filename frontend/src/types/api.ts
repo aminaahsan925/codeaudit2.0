@@ -17,6 +17,7 @@ export interface paths {
          * Demo sign-in (no Google account)
          * @description Sign in as the clearly-labelled local demo user. Only available while
          *     Google sign-in is unconfigured; disabled as soon as Google is set up.
+         *     The session token travels as an HttpOnly cookie, never in the body.
          */
         post: operations["demo_login_api_auth_demo_login_post"];
         delete?: never;
@@ -35,7 +36,8 @@ export interface paths {
         /**
          * Google sign-in callback
          * @description Finish Google sign-in: verify the state, swap the code, sign the user
-         *     in, and send the browser back to the frontend with a session token.
+         *     in, and send the browser back to the frontend. The session token travels
+         *     as an HttpOnly cookie on the redirect, never in the URL.
          */
         get: operations["google_callback_api_auth_google_callback_get"];
         put?: never;
@@ -77,8 +79,8 @@ export interface paths {
         put?: never;
         /**
          * Sign out
-         * @description Sessions live client-side, so there is nothing to clear server-side;
-         *     the frontend discards its token.
+         * @description Sign out: expire the session cookie. The token itself is stateless,
+         *     so there is nothing else to clear server-side.
          */
         post: operations["logout_api_auth_logout_post"];
         delete?: never;
@@ -488,8 +490,7 @@ export interface components {
         };
         /**
          * LogoutResponse
-         * @description Sign-out confirmation. Sessions live client-side, so there is nothing
-         *     to clear server-side; the frontend discards the token.
+         * @description Sign-out confirmation. The backend expires the session cookie.
          */
         LogoutResponse: {
             /**
@@ -578,13 +579,14 @@ export interface components {
         };
         /**
          * SessionResponse
-         * @description A fresh session: the token plus the user it belongs to.
+         * @description A fresh session: the user it belongs to.
+         *
+         *     The token itself is never in the body; the backend sets it as an
+         *     HttpOnly cookie on the response.
          */
         SessionResponse: {
             /** Demo */
             demo: boolean;
-            /** Token */
-            token: string;
             user: components["schemas"]["UserResponse"];
         };
         /**

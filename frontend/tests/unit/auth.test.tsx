@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthControls } from "@/components/auth-controls";
 import { SignInButton } from "@/components/sign-in-button";
-import { setSessionToken } from "@/lib/session";
 
 import { renderWithQueryClient } from "./test-utils";
 
@@ -44,9 +43,23 @@ const DEMO_USER = {
 };
 
 beforeEach(() => {
-  window.localStorage.clear();
   replaceMock.mockClear();
 });
+
+function unauthorized(): Response {
+  return json(
+    { error: { code: "unauthorized", message: "Authentication is required." } },
+    401,
+  );
+}
+
+/** A guest: /me is 401, providers return the given flags. */
+function stubGuest(providers: { google: boolean; demo: boolean }) {
+  return stubFetch(async (req) => {
+    if (new URL(req.url).pathname === "/api/auth/me") return unauthorized();
+    return json(providers);
+  });
+}
 
 describe("SignInButton", () => {
   it("shows a disabled placeholder while providers load", () => {
@@ -57,7 +70,7 @@ describe("SignInButton", () => {
   });
 
   it("shows Sign in with Google when Google is available", async () => {
-    stubFetch(async () => json({ google: true, demo: false }));
+    stubGuest({ google: true, demo: false });
     renderWithQueryClient(<SignInButton />);
     const link = await screen.findByRole("link", {
       name: "Sign in with Google",
@@ -69,7 +82,7 @@ describe("SignInButton", () => {
   });
 
   it("shows the clearly-labelled demo sign-in when Google is not configured", async () => {
-    stubFetch(async () => json({ google: false, demo: true }));
+    stubGuest({ google: false, demo: true });
     renderWithQueryClient(<SignInButton />);
     expect(
       await screen.findByRole("button", { name: "Demo sign-in" }),
@@ -80,11 +93,12 @@ describe("SignInButton", () => {
   });
 
   it("signs in the demo user and then shows the signed-in state", async () => {
+    let signedIn = false;
     const fetchMock = stubFetch(async (req) => {
       const path = new URL(req.url).pathname;
       if (path === "/api/auth/demo-login") {
+        signedIn = true;
         return json({
-          token: "demo-token",
           demo: true,
           user: {
             id: "00000000-0000-0000-0000-000000000001",
@@ -95,7 +109,9 @@ describe("SignInButton", () => {
           },
         });
       }
-      if (path === "/api/auth/me") return json(DEMO_USER);
+      if (path === "/api/auth/me") {
+        return signedIn ? json(DEMO_USER) : unauthorized();
+      }
       return json({ google: false, demo: true });
     });
     renderWithQueryClient(<SignInButton />);
@@ -116,7 +132,6 @@ describe("SignInButton", () => {
   });
 
   it("shows the signed-in user when a session already exists", async () => {
-    setSessionToken("session-token-abc");
     stubFetch(async (req) => {
       const path = new URL(req.url).pathname;
       if (path === "/api/auth/me") return json(GOOGLE_USER);
@@ -145,7 +160,6 @@ describe("SignInButton", () => {
 
 describe("AuthControls", () => {
   it("shows the signed-in user with picture and a sign-out button", async () => {
-    setSessionToken("session-token-abc");
     stubFetch(async (req) => {
       const path = new URL(req.url).pathname;
       if (path === "/api/auth/me") return json(GOOGLE_USER);
@@ -161,7 +175,6 @@ describe("AuthControls", () => {
   });
 
   it("labels a demo user as Demo in the header", async () => {
-    setSessionToken("demo-token");
     stubFetch(async (req) => {
       const path = new URL(req.url).pathname;
       if (path === "/api/auth/me") return json(DEMO_USER);
@@ -173,7 +186,7 @@ describe("AuthControls", () => {
   });
 
   it("shows a compact sign-in link when signed out and Google is available", async () => {
-    stubFetch(async () => json({ google: true, demo: false }));
+    stubGuest({ google: true, demo: false });
     renderWithQueryClient(<AuthControls />);
     const link = await screen.findByRole("link", { name: "Sign in" });
     expect(link).toHaveAttribute(
@@ -183,16 +196,16 @@ describe("AuthControls", () => {
   });
 
   it("renders nothing when signed out and only demo sign-in is available", async () => {
-    stubFetch(async () => json({ google: false, demo: true }));
+    stubGuest({ google: false, demo: true });
     const { container } = renderWithQueryClient(<AuthControls />);
     await waitFor(() =>
       expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument(),
     );
-    expect(container).toBeEmptyDOMElement();
+    // The /me check runs first: wait until it settles and the header is empty.
+    await waitFor(() => expect(container).toBeEmptyDOMElement());
   });
 
-  it("signing out clears the token and goes home", async () => {
-    setSessionToken("session-token-abc");
+  it("signing out calls logout and goes home", async () => {
     const fetchMock = stubFetch(async (req) => {
       const path = new URL(req.url).pathname;
       if (path === "/api/auth/me") return json(GOOGLE_USER);
@@ -208,9 +221,6 @@ describe("AuthControls", () => {
           (call) => new URL(call[0].url).pathname === "/api/auth/logout",
         ),
       ).toBe(true),
-    );
-    await waitFor(() =>
-      expect(window.localStorage.getItem("launchaudit:session:v1")).toBeNull(),
     );
     expect(replaceMock).toHaveBeenCalledWith("/");
   });

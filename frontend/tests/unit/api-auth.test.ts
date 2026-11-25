@@ -7,7 +7,6 @@ import {
   googleLoginUrl,
   logout,
 } from "@/lib/api";
-import { clearSessionToken, setSessionToken } from "@/lib/session";
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -64,7 +63,6 @@ describe("auth API helpers", () => {
   it("demoLogin posts to /api/auth/demo-login and parses the session", async () => {
     const fetchMock = stubFetch(async () =>
       json({
-        token: "demo-token",
         demo: true,
         user: {
           id: "00000000-0000-0000-0000-000000000001",
@@ -76,7 +74,7 @@ describe("auth API helpers", () => {
       }),
     );
     const session = await demoLogin();
-    expect(session.token).toBe("demo-token");
+    expect(session).not.toHaveProperty("token");
     expect(session.demo).toBe(true);
     const req = fetchMock.mock.calls[0]![0];
     expect(new URL(req.url).pathname).toBe("/api/auth/demo-login");
@@ -98,33 +96,21 @@ describe("auth API helpers", () => {
   });
 });
 
-describe("session token on API calls", () => {
-  it("sends the stored token as a Bearer header", async () => {
-    setSessionToken("session-token-abc");
+describe("session cookie on API calls", () => {
+  it("sends cookies with every request", async () => {
+    const fetchMock = stubFetch(async () =>
+      json({ google: false, demo: true }),
+    );
+    await getProviders();
+    const req = fetchMock.mock.calls[0]![0];
+    expect(req.credentials).toBe("include");
+  });
+
+  it("never sends an Authorization header: the token lives in the cookie", async () => {
     const fetchMock = stubFetch(async () =>
       json({ subject: "dev", email: null, name: null, picture_url: null, demo: false }),
     );
     await getMe();
-    const req = fetchMock.mock.calls[0]![0];
-    expect(req.headers.get("Authorization")).toBe("Bearer session-token-abc");
-  });
-
-  it("sends no Authorization header when signed out", async () => {
-    const fetchMock = stubFetch(async () =>
-      json({ google: false, demo: true }),
-    );
-    await getProviders();
-    const req = fetchMock.mock.calls[0]![0];
-    expect(req.headers.get("Authorization")).toBeNull();
-  });
-
-  it("stops sending the header after the token is cleared", async () => {
-    setSessionToken("session-token-abc");
-    clearSessionToken();
-    const fetchMock = stubFetch(async () =>
-      json({ google: false, demo: true }),
-    );
-    await getProviders();
     const req = fetchMock.mock.calls[0]![0];
     expect(req.headers.get("Authorization")).toBeNull();
   });

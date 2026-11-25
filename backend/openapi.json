@@ -744,7 +744,7 @@
         "type": "object"
       },
       "LogoutResponse": {
-        "description": "Sign-out confirmation. Sessions live client-side, so there is nothing\nto clear server-side; the frontend discards the token.",
+        "description": "Sign-out confirmation. The backend expires the session cookie.",
         "properties": {
           "signed_out": {
             "default": true,
@@ -962,22 +962,17 @@
         "type": "object"
       },
       "SessionResponse": {
-        "description": "A fresh session: the token plus the user it belongs to.",
+        "description": "A fresh session: the user it belongs to.\n\nThe token itself is never in the body; the backend sets it as an\nHttpOnly cookie on the response.",
         "properties": {
           "demo": {
             "title": "Demo",
             "type": "boolean"
-          },
-          "token": {
-            "title": "Token",
-            "type": "string"
           },
           "user": {
             "$ref": "#/components/schemas/UserResponse"
           }
         },
         "required": [
-          "token",
           "user",
           "demo"
         ],
@@ -1139,7 +1134,7 @@
   "paths": {
     "/api/auth/demo-login": {
       "post": {
-        "description": "Sign in as the clearly-labelled local demo user. Only available while\nGoogle sign-in is unconfigured; disabled as soon as Google is set up.",
+        "description": "Sign in as the clearly-labelled local demo user. Only available while\nGoogle sign-in is unconfigured; disabled as soon as Google is set up.\nThe session token travels as an HttpOnly cookie, never in the body.",
         "operationId": "demo_login_api_auth_demo_login_post",
         "responses": {
           "200": {
@@ -1171,7 +1166,7 @@
     },
     "/api/auth/google/callback": {
       "get": {
-        "description": "Finish Google sign-in: verify the state, swap the code, sign the user\nin, and send the browser back to the frontend with a session token.",
+        "description": "Finish Google sign-in: verify the state, swap the code, sign the user\nin, and send the browser back to the frontend. The session token travels\nas an HttpOnly cookie on the redirect, never in the URL.",
         "operationId": "google_callback_api_auth_google_callback_get",
         "parameters": [
           {
@@ -1281,7 +1276,7 @@
     },
     "/api/auth/logout": {
       "post": {
-        "description": "Sessions live client-side, so there is nothing to clear server-side;\nthe frontend discards its token.",
+        "description": "Sign out: expire the session cookie. The token itself is stateless,\nso there is nothing else to clear server-side.",
         "operationId": "logout_api_auth_logout_post",
         "responses": {
           "200": {

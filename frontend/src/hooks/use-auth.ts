@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 
 import {
   demoLogin,
@@ -14,37 +14,10 @@ import {
   type ProvidersResponse,
   type SessionResponse,
 } from "@/lib/api";
-import {
-  clearSessionToken,
-  getSessionToken,
-  SESSION_CHANGED_EVENT,
-  setSessionToken,
-} from "@/lib/session";
+import { notifySessionChanged, SESSION_CHANGED_EVENT } from "@/lib/session";
 
 export const providersQueryKey = ["auth", "providers"] as const;
 export const meQueryKey = ["auth", "me"] as const;
-
-/**
- * The stored session token, reacting to sign-in and sign-out in this tab and
- * to storage events from other tabs. Starts null so the first render matches
- * the server, then reads the real value in an effect.
- */
-export function useSessionToken(): string | null {
-  const [token, setToken] = useState<string | null>(null);
-
-  useEffect(() => {
-    const refresh = () => setToken(getSessionToken());
-    refresh();
-    window.addEventListener(SESSION_CHANGED_EVENT, refresh);
-    window.addEventListener("storage", refresh);
-    return () => {
-      window.removeEventListener(SESSION_CHANGED_EVENT, refresh);
-      window.removeEventListener("storage", refresh);
-    };
-  }, []);
-
-  return token;
-}
 
 /** Which sign-in options the backend currently offers. */
 export function useProviders() {
@@ -56,47 +29,47 @@ export function useProviders() {
 }
 
 /**
- * The signed-in user, or null for a guest. The query only runs while a token
- * is stored; a 401 clears the stored token, so an expired session signs the
- * user out instead of erroring forever.
+ * The signed-in user, or null for a guest. The session lives in an HttpOnly
+ * cookie, so this query always runs: a 401 just means nobody is signed in.
+ * Sign-in and sign-out invalidate the query, so the header follows at once.
  */
 export function useAuth() {
-  const token = useSessionToken();
+  const queryClient = useQueryClient();
   const query = useQuery<MeResponse, ApiError>({
     queryKey: meQueryKey,
     queryFn: ({ signal }) => getMe({ signal }),
-    enabled: token !== null,
     retry: false,
     staleTime: 5 * 60_000,
   });
 
   useEffect(() => {
-    if (token !== null && query.isError && query.error.status === 401) {
-      clearSessionToken();
-    }
-  }, [token, query.isError, query.error]);
+    const refresh = () => {
+      void queryClient.invalidateQueries({ queryKey: meQueryKey });
+    };
+    window.addEventListener(SESSION_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(SESSION_CHANGED_EVENT, refresh);
+  }, [queryClient]);
 
   return {
     user: query.data ?? null,
-    isSignedIn: token !== null && query.isSuccess,
-    isLoading: token !== null && query.isPending,
-    token,
+    isSignedIn: query.isSuccess,
+    isLoading: query.isPending,
   };
 }
 
-/** Signs in the clearly-labelled local demo user and stores its session. */
+/** Signs in the clearly-labelled local demo user. */
 export function useDemoLogin() {
   const queryClient = useQueryClient();
   return useMutation<SessionResponse, ApiError, void>({
     mutationFn: () => demoLogin(),
-    onSuccess: (session) => {
-      setSessionToken(session.token);
+    onSuccess: () => {
+      notifySessionChanged();
       void queryClient.invalidateQueries({ queryKey: meQueryKey });
     },
   });
 }
 
-/** Signs out: tells the backend, drops the stored token, goes home. */
+/** Signs out: tells the backend (which clears the session cookie), goes home. */
 export function useSignOut() {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -104,9 +77,9 @@ export function useSignOut() {
     try {
       await logout();
     } catch {
-      // Signing out locally regardless; the token is discarded either way.
+      // Signing out locally regardless; the cookie is cleared either way.
     }
-    clearSessionToken();
+    notifySessionChanged();
     queryClient.removeQueries({ queryKey: meQueryKey });
     router.replace("/");
   }, [queryClient, router]);

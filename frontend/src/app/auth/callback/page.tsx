@@ -1,30 +1,36 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { ButtonLink } from "@/components/button-link";
-import { setSessionToken } from "@/lib/session";
+import { getMe } from "@/lib/api";
 
 /**
- * Landing page for the backend's Google callback redirect, which carries the
- * session token as a ?token= query param. Stores the token and sends the
- * user home; the replace drops the token from the URL bar. Rendered behind
- * Suspense because useSearchParams needs a boundary under cacheComponents.
+ * Landing page for the backend's Google callback redirect. The session
+ * token arrives as an HttpOnly cookie on that redirect, so this page only
+ * has to ask the backend who is signed in: success goes home, a 401 means
+ * the sign-in did not finish.
  */
-function CallbackCapture() {
+export default function AuthCallbackPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const token = searchParams.get("token");
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    if (token) {
-      setSessionToken(token);
-      router.replace("/");
-    }
-  }, [router, token]);
+    let cancelled = false;
+    getMe()
+      .then(() => {
+        if (!cancelled) router.replace("/");
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
-  if (!token) {
+  if (failed) {
     return (
       <div className="container-page flex flex-col items-start gap-4 py-16">
         <h1 className="text-2xl font-bold tracking-[-0.02em]">
@@ -44,19 +50,5 @@ function CallbackCapture() {
     <div className="container-page py-16">
       <p className="text-muted-foreground">Signing you in...</p>
     </div>
-  );
-}
-
-export default function AuthCallbackPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="container-page py-16">
-          <p className="text-muted-foreground">Signing you in...</p>
-        </div>
-      }
-    >
-      <CallbackCapture />
-    </Suspense>
   );
 }

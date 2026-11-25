@@ -1,7 +1,6 @@
 import createClient from "openapi-fetch";
 
 import { env } from "@/lib/env";
-import { getSessionToken } from "@/lib/session";
 import type { paths } from "@/types/api";
 
 import {
@@ -12,27 +11,19 @@ import {
 
 export const DEFAULT_TIMEOUT_MS = 10_000;
 
-/** Low-level typed client. Prefer the per-resource helpers (e.g. getHealth). */
+/**
+ * Low-level typed client. Prefer the per-resource helpers (e.g. getHealth).
+ *
+ * `credentials: "include"` sends the HttpOnly session cookie with every
+ * call, including cross-origin ones to the API. No Authorization header is
+ * ever set here: the token lives in the cookie, out of JavaScript's reach.
+ */
 export const apiClient = createClient<paths>({
   baseUrl: env.NEXT_PUBLIC_API_BASE_URL,
   headers: { Accept: "application/json" },
-  credentials: "omit",
+  credentials: "include",
   // Resolve fetch per call so tests and instrumentation can replace it.
   fetch: (request: Request) => globalThis.fetch(request),
-});
-
-/**
- * Sends the stored session token as Authorization: Bearer when one exists.
- * Anonymous requests (guest runs, public endpoints) go out without a header.
- */
-apiClient.use({
-  onRequest({ request }) {
-    const token = getSessionToken();
-    if (token !== null) {
-      request.headers.set("Authorization", `Bearer ${token}`);
-    }
-    return request;
-  },
 });
 
 type FetchResult<TData> = Promise<{
