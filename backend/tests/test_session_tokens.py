@@ -5,11 +5,15 @@ from uuid import uuid4
 
 import jwt
 import pytest
+from starlette.responses import Response
 
 from app.core.security import (
+    SESSION_COOKIE_NAME,
     SESSION_ISSUER,
+    clear_session_cookie,
     issue_oauth_state,
     issue_session_token,
+    set_session_cookie,
     verify_oauth_state,
     verify_session_token,
 )
@@ -168,3 +172,52 @@ def test_session_token_is_not_a_valid_oauth_state(user_id) -> None:
     )
 
     assert verify_oauth_state(token, SECRET) is False
+
+
+def test_session_cookie_is_httponly_and_lax_outside_production(user_id) -> None:
+    token = issue_session_token(
+        SECRET,
+        user_id=user_id,
+        email="amina@example.com",
+        name=None,
+        picture_url=None,
+        demo=False,
+    )
+    response = Response()
+    set_session_cookie(response, token, production=False)
+
+    cookie = response.headers["set-cookie"]
+    assert f"{SESSION_COOKIE_NAME}={token}" in cookie
+    assert "HttpOnly" in cookie
+    assert "SameSite=lax" in cookie
+    assert "Secure" not in cookie
+    assert "Max-Age=2592000" in cookie
+    assert "Path=/" in cookie
+
+
+def test_session_cookie_is_secure_and_cross_site_in_production(user_id) -> None:
+    token = issue_session_token(
+        SECRET,
+        user_id=user_id,
+        email="amina@example.com",
+        name=None,
+        picture_url=None,
+        demo=False,
+    )
+    response = Response()
+    set_session_cookie(response, token, production=True)
+
+    cookie = response.headers["set-cookie"]
+    assert "HttpOnly" in cookie
+    assert "SameSite=none" in cookie
+    assert "Secure" in cookie
+
+
+def test_clear_session_cookie_expires_it() -> None:
+    response = Response()
+    clear_session_cookie(response, production=False)
+
+    cookie = response.headers["set-cookie"]
+    assert f"{SESSION_COOKIE_NAME}=" in cookie
+    assert "Max-Age=0" in cookie
+    assert "HttpOnly" in cookie

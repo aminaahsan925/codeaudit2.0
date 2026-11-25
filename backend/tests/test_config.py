@@ -350,6 +350,38 @@ def test_production_reports_all_rule_violations(settings_factory: SettingsFactor
     assert TOKEN_SECRET not in message
 
 
+def test_production_google_without_session_secret_is_rejected(
+    settings_factory: SettingsFactory,
+) -> None:
+    """Google configured but no session secret means sign-in is silently
+    unavailable in production, so the app must refuse to start."""
+    with pytest.raises(ValidationError) as excinfo:
+        settings_factory(
+            environment="production",
+            google_client_id="id.apps.googleusercontent.com",
+            google_client_secret="google-client-secret-0123456789abcdef",  # noqa: S106
+            google_redirect_uri="https://api.example.com/auth/google/callback",
+            session_secret=None,
+        )
+
+    assert "SESSION_SECRET must be set in production" in str(excinfo.value)
+
+
+def test_production_google_with_session_secret_is_accepted(
+    settings_factory: SettingsFactory,
+) -> None:
+    settings = settings_factory(
+        environment="production",
+        google_client_id="id.apps.googleusercontent.com",
+        google_client_secret="google-client-secret-0123456789abcdef",  # noqa: S106
+        google_redirect_uri="https://api.example.com/auth/google/callback",
+        session_secret="session-secret-0123456789abcdef0123456789",  # noqa: S106
+    )
+
+    assert settings.is_production is True
+    assert settings.google_configured is True
+
+
 def test_explicit_settings_ignore_the_environment(
     clean_env: pytest.MonkeyPatch, settings_factory: SettingsFactory
 ) -> None:

@@ -261,8 +261,45 @@ def verify_bearer_token(provided: str | None, expected: SecretStr | None) -> boo
 
 SESSION_ISSUER: Final = "launchaudit"
 SESSION_TOKEN_EXPIRY_DAYS: Final = 30
+SESSION_COOKIE_NAME: Final = "launchaudit_session"
 OAUTH_STATE_EXPIRY_MINUTES: Final = 10
 _OAUTH_STATE_PURPOSE: Final = "oauth-state"
+
+
+def session_cookie_attributes(*, production: bool) -> dict[str, object]:
+    """Attributes for the session cookie.
+
+    HttpOnly, so JavaScript can never read the token: an XSS anywhere in the
+    app cannot steal the session. SameSite=Lax in development and test, where
+    the frontend and the API are same-site (localhost). SameSite=None in
+    production, where the frontend (Vercel) and the API (Render) are
+    cross-site and the cookie must travel with fetch calls, which also
+    requires Secure.
+    """
+    return {
+        "key": SESSION_COOKIE_NAME,
+        "httponly": True,
+        "samesite": "none" if production else "lax",
+        "secure": production,
+        "path": "/",
+        "max_age": SESSION_TOKEN_EXPIRY_DAYS * 24 * 3600,
+    }
+
+
+def set_session_cookie(response: Response, token: str, *, production: bool) -> None:
+    """Attach the session token as an HttpOnly cookie on a response."""
+    response.set_cookie(value=token, **session_cookie_attributes(production=production))
+
+
+def clear_session_cookie(response: Response, *, production: bool) -> None:
+    """Expire the session cookie. Attributes must match the cookie set."""
+    response.delete_cookie(
+        key=SESSION_COOKIE_NAME,
+        path="/",
+        samesite="none" if production else "lax",
+        secure=production,
+        httponly=True,
+    )
 
 
 @dataclass(frozen=True, slots=True)

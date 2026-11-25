@@ -30,17 +30,19 @@ def test_allowed_origin_preflight_succeeds(client: TestClient) -> None:
     assert "Authorization" in response.headers["access-control-allow-headers"]
 
 
-def test_preflight_never_allows_credentials(client: TestClient) -> None:
+def test_preflight_allows_credentials(client: TestClient) -> None:
+    """The session cookie travels cross-origin, so allowed origins get
+    Access-Control-Allow-Credentials."""
     response = preflight(client, ALLOWED)
 
-    assert "access-control-allow-credentials" not in response.headers
+    assert response.headers["access-control-allow-credentials"] == "true"
 
 
 def test_actual_request_from_allowed_origin_has_cors_header(client: TestClient) -> None:
     response = client.get("/api/health", headers={"Origin": ALLOWED})
 
     assert response.headers["access-control-allow-origin"] == ALLOWED
-    assert "access-control-allow-credentials" not in response.headers
+    assert response.headers["access-control-allow-credentials"] == "true"
 
 
 def test_disallowed_origin_preflight_uses_error_format(client: TestClient) -> None:

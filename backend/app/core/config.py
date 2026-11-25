@@ -185,6 +185,11 @@ class Settings(BaseSettings):
                 "API_AUTH_TOKEN must not be set in production: the shared-token auth stub "
                 "is for development and test only"
             )
+        if self.google_configured and self.session_secret is None:
+            problems.append(
+                "SESSION_SECRET must be set in production when Google sign-in is "
+                "configured, or sign-in is silently unavailable"
+            )
         if problems:
             raise ValueError("; ".join(problems))
         return self

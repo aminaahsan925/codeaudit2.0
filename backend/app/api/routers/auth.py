@@ -5,15 +5,25 @@ callback swaps the code for an ID token, verifies it, and issues a session
 token. Demo sign-in exists only while Google is unconfigured, so judges can
 try the app without a Google account; it is labelled demo everywhere and is
 never presented as Google sign-in.
+
+Sessions travel as an HttpOnly cookie, never in a URL or in JavaScript
+storage, so a token cannot leak into browser history, logs or Referer
+headers and an XSS anywhere in the app cannot steal it.
 """
 
 from fastapi import APIRouter
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentPrincipal, DbSession, HttpClient, SettingsDep
 from app.core.errors import AppError, NotFoundError
-from app.core.security import issue_oauth_state, issue_session_token, verify_oauth_state
+from app.core.security import (
+    clear_session_cookie,
+    issue_oauth_state,
+    issue_session_token,
+    set_session_cookie,
+    verify_oauth_state,
+)
 from app.schemas.auth import (
     LogoutResponse,
     MeResponse,
@@ -83,7 +93,8 @@ def google_callback(
     error: str | None = None,
 ) -> RedirectResponse:
     """Finish Google sign-in: verify the state, swap the code, sign the user
-    in, and send the browser back to the frontend with a session token."""
+    in, and send the browser back to the frontend. The session token travels
+    as an HttpOnly cookie on the redirect, never in the URL."""
     if error is not None:
         raise AppError("Google sign-in was cancelled or failed.")
     session_secret = settings.session_secret
@@ -112,7 +123,9 @@ def google_callback(
         picture_url=user.picture_url,
         demo=False,
     )
-    return RedirectResponse(f"{settings.frontend_url}/auth/callback?token={token}", status_code=302)
+    response = RedirectResponse(f"{settings.frontend_url}/auth/callback", status_code=302)
+    set_session_cookie(response, token, production=settings.is_production)
+    return response
 
 
 @router.post(
@@ -120,9 +133,10 @@ def google_callback(
     summary="Demo sign-in (no Google account)",
     responses=error_responses(404),
 )
-def demo_login(settings: SettingsDep, session: DbSession) -> SessionResponse:
+def demo_login(response: Response, settings: SettingsDep, session: DbSession) -> SessionResponse:
     """Sign in as the clearly-labelled local demo user. Only available while
-    Google sign-in is unconfigured; disabled as soon as Google is set up."""
+    Google sign-in is unconfigured; disabled as soon as Google is set up.
+    The session token travels as an HttpOnly cookie, never in the body."""
     session_secret = settings.session_secret
     if settings.google_configured or session_secret is None:
         raise NotFoundError("Demo sign-in is not available.")
@@ -136,13 +150,15 @@ def demo_login(settings: SettingsDep, session: DbSession) -> SessionResponse:
         picture_url=user.picture_url,
         demo=True,
     )
-    return SessionResponse(token=token, user=_user_response(user), demo=True)
+    set_session_cookie(response, token, production=settings.is_production)
+    return SessionResponse(user=_user_response(user), demo=True)
 
 
 @router.post("/logout", summary="Sign out")
-def logout() -> LogoutResponse:
-    """Sessions live client-side, so there is nothing to clear server-side;
-    the frontend discards its token."""
+def logout(response: Response, settings: SettingsDep) -> LogoutResponse:
+    """Sign out: expire the session cookie. The token itself is stateless,
+    so there is nothing else to clear server-side."""
+    clear_session_cookie(response, production=settings.is_production)
     return LogoutResponse(signed_out=True)
 
 

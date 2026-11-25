@@ -35,15 +35,17 @@ class ProvidersResponse(BaseModel):
 
 
 class SessionResponse(BaseModel):
-    """A fresh session: the token plus the user it belongs to."""
+    """A fresh session: the user it belongs to.
 
-    token: str
+    The token itself is never in the body; the backend sets it as an
+    HttpOnly cookie on the response.
+    """
+
     user: UserResponse
     demo: bool
 
 
 class LogoutResponse(BaseModel):
-    """Sign-out confirmation. Sessions live client-side, so there is nothing
-    to clear server-side; the frontend discards the token."""
+    """Sign-out confirmation. The backend expires the session cookie."""
 
     signed_out: bool = True

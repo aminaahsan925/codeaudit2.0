@@ -10,7 +10,12 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.core.errors import UnauthorizedError
-from app.core.security import Principal, verify_bearer_token, verify_session_token
+from app.core.security import (
+    SESSION_COOKIE_NAME,
+    Principal,
+    verify_bearer_token,
+    verify_session_token,
+)
 from app.db import get_db
 
 bearer_scheme = HTTPBearer(
@@ -42,18 +47,24 @@ HttpClient = Annotated[httpx.Client, Depends(get_http_client)]
 def authenticate_optional(
     settings: Settings,
     credentials: HTTPAuthorizationCredentials | None,
+    cookie_token: str | None = None,
 ) -> Principal | None:
-    """Validate an optional bearer token.
+    """Validate an optional bearer token or session cookie.
 
-    Returns None when no token was presented (guest). A valid session token
-    gives the signed-in user's principal (in every environment). Otherwise
-    the development token stub is tried, which never authenticates anyone in
+    A Bearer token is tried first (API clients, tests); otherwise the
+    HttpOnly session cookie the browser sends with the request. Returns None
+    when no token was presented (guest). A valid session token gives the
+    signed-in user's principal (in every environment). Otherwise the
+    development token stub is tried, which never authenticates anyone in
     production. Raises UnauthorizedError for a presented token that does not
     verify, so a bad token never silently becomes a guest.
     """
-    if credentials is None:
+    if credentials is not None:
+        token = credentials.credentials
+    elif cookie_token:
+        token = cookie_token
+    else:
         return None
-    token = credentials.credentials
     session_secret = settings.session_secret
     if session_secret is not None:
         claims = verify_session_token(token, session_secret.get_secret_value())
@@ -74,21 +85,25 @@ def authenticate_optional(
 
 
 def optional_auth(
+    request: Request,
     settings: SettingsDep,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
 ) -> Principal | None:
     """Optional auth: a valid token gives a principal, no token gives None."""
-    return authenticate_optional(settings, credentials)
+    return authenticate_optional(settings, credentials, request.cookies.get(SESSION_COOKIE_NAME))
 
 
 def require_auth(
+    request: Request,
     settings: SettingsDep,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
 ) -> Principal:
     """Accept a valid session token, or the development token stub outside
     production. Rejects everything when no token is presented or valid.
     """
-    principal = authenticate_optional(settings, credentials)
+    principal = authenticate_optional(
+        settings, credentials, request.cookies.get(SESSION_COOKIE_NAME)
+    )
     if principal is None:
         raise UnauthorizedError("Missing or invalid bearer token.")
     return principal
