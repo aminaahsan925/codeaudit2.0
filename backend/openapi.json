@@ -1166,7 +1166,7 @@
     },
     "/api/auth/google/callback": {
       "get": {
-        "description": "Finish Google sign-in: verify the state, swap the code, sign the user\nin, and send the browser back to the frontend. The session token travels\nas an HttpOnly cookie on the redirect, never in the URL.",
+        "description": "Finish Google sign-in: verify the state, swap the code, sign the user\nin, and send the browser back to the frontend. The session token travels\nas an HttpOnly cookie on the redirect, never in the URL. Every failure\n(Google sent an `error`, a bad state, a failed token exchange or\nverification) redirects to the frontend sign-in page with an error flag\ninstead of returning a JSON error to the browser.",
         "operationId": "google_callback_api_auth_google_callback_get",
         "parameters": [
           {
@@ -1221,16 +1221,6 @@
         "responses": {
           "307": {
             "description": "Successful Response"
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Bad Request"
           },
           "422": {
             "content": {

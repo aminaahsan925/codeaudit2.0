@@ -9,14 +9,22 @@ never presented as Google sign-in.
 Sessions travel as an HttpOnly cookie, never in a URL or in JavaScript
 storage, so a token cannot leak into browser history, logs or Referer
 headers and an XSS anywhere in the app cannot steal it.
+
+The Google callback is a browser navigation, not an API call, so its
+failures must never surface as a raw JSON error page: any failure or
+cancellation sends the browser back to the frontend sign-in page with an
+`error=google_failed` flag the page can show.
 """
+
+import logging
 
 from fastapi import APIRouter
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentPrincipal, DbSession, HttpClient, SettingsDep
-from app.core.errors import AppError, NotFoundError
+from app.core.config import Settings
+from app.core.errors import NotFoundError
 from app.core.security import (
     clear_session_cookie,
     issue_oauth_state,
@@ -41,7 +49,17 @@ from app.services.auth import (
     verify_id_token,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _sign_in_failed(settings: Settings) -> RedirectResponse:
+    """Send the browser back to the frontend sign-in page after a failed or
+    cancelled Google sign-in, instead of showing a raw API error page."""
+    return RedirectResponse(
+        f"{settings.frontend_url}/sign-in?error=google_failed", status_code=302
+    )
 
 
 def _user_response(user: User) -> UserResponse:
@@ -81,7 +99,6 @@ def google_login(settings: SettingsDep) -> RedirectResponse:
 @router.get(
     "/google/callback",
     summary="Google sign-in callback",
-    responses=error_responses(400),
     response_class=RedirectResponse,
 )
 def google_callback(
@@ -94,9 +111,13 @@ def google_callback(
 ) -> RedirectResponse:
     """Finish Google sign-in: verify the state, swap the code, sign the user
     in, and send the browser back to the frontend. The session token travels
-    as an HttpOnly cookie on the redirect, never in the URL."""
+    as an HttpOnly cookie on the redirect, never in the URL. Every failure
+    (Google sent an `error`, a bad state, a failed token exchange or
+    verification) redirects to the frontend sign-in page with an error flag
+    instead of returning a JSON error to the browser."""
     if error is not None:
-        raise AppError("Google sign-in was cancelled or failed.")
+        logger.info("Google sign-in did not complete: %s", error)
+        return _sign_in_failed(settings)
     session_secret = settings.session_secret
     if (
         not settings.google_configured
@@ -105,16 +126,22 @@ def google_callback(
         or state is None
         or not verify_oauth_state(state, session_secret.get_secret_value())
     ):
-        raise AppError("Sign-in failed. Try again.")
-    id_token = exchange_code(client, settings, code)
-    client_id = settings.google_client_id or ""
-    profile = verify_id_token(client, id_token, client_id)
+        logger.info("Google sign-in callback rejected: missing or invalid parameters")
+        return _sign_in_failed(settings)
     try:
+        id_token = exchange_code(client, settings, code)
+        client_id = settings.google_client_id or ""
+        profile = verify_id_token(client, id_token, client_id)
         user = upsert_google_user(session, profile)
         session.commit()
     except IntegrityError:
         session.rollback()
-        raise AppError("Sign-in failed. Try again.") from None
+        logger.info("Google sign-in failed while storing the user")
+        return _sign_in_failed(settings)
+    except Exception:
+        session.rollback()
+        logger.exception("Google sign-in failed during the callback")
+        return _sign_in_failed(settings)
     token = issue_session_token(
         session_secret.get_secret_value(),
         user_id=user.id,

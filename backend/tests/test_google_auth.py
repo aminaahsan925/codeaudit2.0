@@ -351,31 +351,38 @@ def test_concurrent_upserts_for_a_new_user_create_one_row(tmp_path: Path) -> Non
     engine.dispose()
 
 
-def test_callback_bad_state_is_400(auth_client: TestClient) -> None:
+def _assert_sign_in_failed_redirect(response: httpx.Response) -> None:
+    """A failed or cancelled callback sends the browser back to the
+    frontend sign-in page with an error flag, never a JSON error page."""
+    assert response.status_code == 302
+    assert response.headers["location"] == "http://localhost:3000/sign-in?error=google_failed"
+    assert "launchaudit_session" not in response.headers.get("set-cookie", "")
+
+
+def test_callback_bad_state_redirects_to_sign_in(auth_client: TestClient) -> None:
     response = auth_client.get(_callback_url(state="not-a-state"), follow_redirects=False)
 
-    assert response.status_code == 400
-    assert response.json()["error"]["code"] == "bad_request"
+    _assert_sign_in_failed_redirect(response)
 
 
-def test_callback_missing_code_is_400(auth_client: TestClient) -> None:
+def test_callback_missing_code_redirects_to_sign_in(auth_client: TestClient) -> None:
     response = auth_client.get(
         f"/api/auth/google/callback?state={_valid_state()}", follow_redirects=False
     )
 
-    assert response.status_code == 400
+    _assert_sign_in_failed_redirect(response)
 
 
-def test_callback_google_error_param_is_400(auth_client: TestClient) -> None:
+def test_callback_google_error_param_redirects_to_sign_in(auth_client: TestClient) -> None:
     response = auth_client.get(
         f"/api/auth/google/callback?error=access_denied&state={_valid_state()}",
         follow_redirects=False,
     )
 
-    assert response.status_code == 400
+    _assert_sign_in_failed_redirect(response)
 
 
-def test_callback_exchange_failure_is_400(make_auth_client: MakeClient) -> None:
+def test_callback_exchange_failure_redirects_to_sign_in(make_auth_client: MakeClient) -> None:
     def failing_handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(400, json={"error": "invalid_grant"})
 
@@ -383,48 +390,48 @@ def test_callback_exchange_failure_is_400(make_auth_client: MakeClient) -> None:
 
     response = client.get(_callback_url(), follow_redirects=False)
 
-    assert response.status_code == 400
+    _assert_sign_in_failed_redirect(response)
     assert "invalid_grant" not in response.text
 
 
-def test_callback_wrong_audience_is_400(make_auth_client: MakeClient) -> None:
+def test_callback_wrong_audience_redirects_to_sign_in(make_auth_client: MakeClient) -> None:
     client = make_auth_client(google_handler=_google_handler(_id_token(aud="another-app")))
 
     response = client.get(_callback_url(), follow_redirects=False)
 
-    assert response.status_code == 400
+    _assert_sign_in_failed_redirect(response)
 
 
-def test_callback_expired_id_token_is_400(make_auth_client: MakeClient) -> None:
+def test_callback_expired_id_token_redirects_to_sign_in(make_auth_client: MakeClient) -> None:
     client = make_auth_client(google_handler=_google_handler(_id_token(exp=int(time.time()) - 10)))
 
     response = client.get(_callback_url(), follow_redirects=False)
 
-    assert response.status_code == 400
+    _assert_sign_in_failed_redirect(response)
 
 
-def test_callback_unverified_email_is_400(make_auth_client: MakeClient) -> None:
+def test_callback_unverified_email_redirects_to_sign_in(make_auth_client: MakeClient) -> None:
     client = make_auth_client(google_handler=_google_handler(_id_token(email_verified=False)))
 
     response = client.get(_callback_url(), follow_redirects=False)
 
-    assert response.status_code == 400
+    _assert_sign_in_failed_redirect(response)
 
 
-def test_callback_unknown_signing_key_is_400(make_auth_client: MakeClient) -> None:
+def test_callback_unknown_signing_key_redirects_to_sign_in(make_auth_client: MakeClient) -> None:
     client = make_auth_client(google_handler=_google_handler(_id_token(kid="rotated-away-key")))
 
     response = client.get(_callback_url(), follow_redirects=False)
 
-    assert response.status_code == 400
+    _assert_sign_in_failed_redirect(response)
 
 
-def test_callback_wrong_signature_is_400(make_auth_client: MakeClient) -> None:
+def test_callback_wrong_signature_redirects_to_sign_in(make_auth_client: MakeClient) -> None:
     client = make_auth_client(google_handler=_google_handler(_id_token(key=_OTHER_KEY)))
 
     response = client.get(_callback_url(), follow_redirects=False)
 
-    assert response.status_code == 400
+    _assert_sign_in_failed_redirect(response)
 
 
 def test_callback_production_cookie_is_secure_and_cross_site(
@@ -434,6 +441,8 @@ def test_callback_production_cookie_is_secure_and_cross_site(
         environment="production",
         api_auth_token=None,
         cors_origins=["https://app.example.com"],
+        frontend_url="https://app.example.com",
+        google_redirect_uri="https://api.example.com/auth/google/callback",
     )
 
     response = client.get(_callback_url(), follow_redirects=False)
@@ -570,6 +579,7 @@ def test_session_token_works_in_production(
         api_auth_token=None,
         google_client_id=None,
         cors_origins=["https://app.example.com"],
+        frontend_url="https://app.example.com",
     )
     assert settings_factory(environment="production").is_production
 
