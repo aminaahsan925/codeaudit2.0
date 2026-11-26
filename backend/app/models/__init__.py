@@ -7,6 +7,7 @@ autogenerates migrations.
 from app.models.audit_run import AuditRunModel
 from app.models.base import Base
 from app.models.finding import FindingModel
+from app.models.rate_limit import RateLimitCounterModel
 from app.models.user import UserModel
 
-__all__ = ["AuditRunModel", "Base", "FindingModel", "UserModel"]
+__all__ = ["AuditRunModel", "Base", "FindingModel", "RateLimitCounterModel", "UserModel"]
