@@ -1,0 +1,41 @@
+name: Build and push deploy images
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to the Azure container registry
+        uses: docker/login-action@v3
+        with:
+          registry: cae36c8ae193acr.azurecr.io
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push the API image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Dockerfile
+          push: true
+          tags: cae36c8ae193acr.azurecr.io/launchaudit-api:latest
+
+      - name: Build and push the broken demo shop image
+        uses: docker/build-push-action@v6
+        with:
+          context: demo-app/broken
+          file: demo-app/broken/Dockerfile
+          push: true
+          tags: cae36c8ae193acr.azurecr.io/launchaudit-demo-broken:latest
+
+      - name: Build and push the fixed demo shop image
+        uses: docker/build-push-action@v6
+        with:
+          context: demo-app/fixed
+          file: demo-app/fixed/Dockerfile
+          push: true
+          tags: cae36c8ae193acr.azurecr.io/launchaudit-demo-fixed:latest
