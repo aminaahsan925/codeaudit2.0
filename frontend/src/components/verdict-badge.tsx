@@ -6,25 +6,25 @@ import { VERDICT_LABEL, type Verdict } from "@/lib/report";
 const config: Record<Verdict, { icon: LucideIcon; tone: string; iconTone: string }> = {
   launch: {
     icon: CircleCheck,
-    tone: "bg-verdict-launch-tint text-verdict-launch-fg border-verdict-launch/45",
+    tone: "bg-verdict-launch-tint text-verdict-launch-fg border-verdict-launch/30",
     iconTone: "text-verdict-launch",
   },
   fix_first: {
     icon: TriangleAlert,
-    tone: "bg-verdict-fix-tint text-verdict-fix-fg border-verdict-fix/45",
+    tone: "bg-verdict-fix-tint text-verdict-fix-fg border-verdict-fix/30",
     iconTone: "text-verdict-fix",
   },
   do_not_launch: {
     icon: OctagonX,
-    tone: "bg-verdict-block-tint text-verdict-block-fg border-verdict-block/45",
+    tone: "bg-verdict-block-tint text-verdict-block-fg border-verdict-block/30",
     iconTone: "text-verdict-block",
   },
 };
 
 const sizes = {
-  sm: "h-6 gap-1.5 px-2 text-xs [&_svg]:size-3.5",
-  md: "h-8 gap-2 px-2.5 text-sm [&_svg]:size-4",
-  lg: "h-11 gap-2.5 px-3.5 text-lg [&_svg]:size-5",
+  sm: "h-6 gap-1.5 rounded-sm px-2 text-xs [&_svg]:size-3.5",
+  md: "h-8 gap-2 rounded-md px-2.5 text-sm [&_svg]:size-4",
+  lg: "h-11 gap-2.5 rounded-lg px-3.5 text-lg [&_svg]:size-5",
 } as const;
 
 export function VerdictBadge({
@@ -41,7 +41,7 @@ export function VerdictBadge({
     <span
       data-verdict={verdict}
       className={cn(
-        "inline-flex items-center rounded-md border font-semibold whitespace-nowrap",
+        "inline-flex items-center border font-semibold whitespace-nowrap",
         sizes[size],
         tone,
         className,

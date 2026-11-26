@@ -36,6 +36,20 @@ describe("FindingCard", () => {
     expect(screen.queryByText("Code")).not.toBeInTheDocument();
   });
 
+  it("leads with the plain-English risk, then the technical name and CWE", () => {
+    render(<FindingCard finding={makeFinding()} index={1} runId={RUN_ID} />);
+    expect(
+      screen.getByRole("heading", {
+        level: 3,
+        name: "A secret value is written into your code",
+      }),
+    ).toBeVisible();
+    expect(screen.getByText("Exposed secret, CWE-798")).toBeVisible();
+    expect(screen.getByText("Built-in check")).toBeVisible();
+    expect(screen.getByRole("button", { name: "What is Critical severity?" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "What is CWE?" })).toBeVisible();
+  });
+
   it("expands to show snippet, trace, evidence, AI verdict and fix guidance", async () => {
     const user = userEvent.setup();
     render(
@@ -78,15 +92,57 @@ describe("FindingCard", () => {
 
     await user.click(screen.getByRole("button", { name: "Show proof" }));
 
+    // Evidence opens first: the code and the live request.
+    expect(screen.getByRole("tab", { name: "Evidence" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Code")).toBeVisible();
     expect(screen.getByText(/const adminKey/)).toBeVisible();
-    expect(screen.getByText("Data flow")).toBeVisible();
-    expect(screen.getByText("User input enters here")).toBeVisible();
     expect(screen.getByText("Live request")).toBeVisible();
     expect(screen.getByText(/\/api\/notes\/1042/)).toBeVisible();
+
+    await user.click(screen.getByRole("tab", { name: "Trace" }));
+    expect(screen.getByText("Data flow")).toBeVisible();
+    expect(screen.getByText("User input enters here")).toBeVisible();
+
+    await user.click(screen.getByRole("tab", { name: "Review note" }));
     expect(screen.getByText("Review: Confirmed")).toBeVisible();
-    expect(screen.getByText("How to fix it")).toBeVisible();
+    expect(screen.getByText("The query builds SQL from the id parameter.")).toBeVisible();
+
+    await user.click(screen.getByRole("tab", { name: "How to fix" }));
+    expect(screen.getByRole("tab", { name: "How to fix" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("heading", { name: "Why it matters" })).toBeVisible();
+  });
+
+  it("numbers the code lines and flags the finding's line", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <FindingCard
+        finding={makeFinding({
+          snippet: 'import db from "./db";\nconst adminKey = "sk_live_****";',
+          start_line: 3,
+          end_line: 4,
+        })}
+        index={1}
+        runId={RUN_ID}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Show proof" }));
+    const flagged = container.querySelectorAll("[data-flagged]");
+    expect(flagged).toHaveLength(2);
+    expect(flagged[1]).toHaveTextContent(/^4const adminKey/);
+    expect(screen.getAllByText("(flagged line)", { exact: false })).toHaveLength(2);
+  });
+
+  it("only offers tabs that have content", async () => {
+    const user = userEvent.setup();
+    render(
+      <FindingCard
+        finding={makeFinding({ trace: [], ai_verdict: null, fix_guidance: null })}
+        index={1}
+        runId={RUN_ID}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Show proof" }));
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Evidence"]);
   });
 
   it("renders package evidence and secret previews", async () => {

@@ -1,8 +1,10 @@
 import { screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { LazyMotion, MotionConfig, MotionGlobalConfig, domAnimation } from "motion/react";
+import type { ReactElement } from "react";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { SharedReportPage } from "@/app/r/[token]/shared-report-page";
-import { ReportPage } from "@/app/reports/[id]/report-page";
+import { SharedReportPage } from "@/app/(shared)/r/[token]/shared-report-page";
+import { ReportPage } from "@/app/(app)/reports/[id]/report-page";
 
 import { makeReport, makeRun, RUN_ID, SHARE_TOKEN } from "./fixtures";
 import { renderWithQueryClient } from "./test-utils";
@@ -26,6 +28,20 @@ function stubFetch(impl: (req: Request) => Promise<Response>) {
 
 afterEach(() => vi.unstubAllGlobals());
 
+// The report animates in; render under the app's motion providers with
+// animations jumping to their end state.
+beforeAll(() => {
+  MotionGlobalConfig.skipAnimations = true;
+});
+
+function renderPage(ui: ReactElement) {
+  return renderWithQueryClient(
+    <LazyMotion features={domAnimation} strict>
+      <MotionConfig reducedMotion="user">{ui}</MotionConfig>
+    </LazyMotion>,
+  );
+}
+
 describe("ReportPage", () => {
   it("renders the report for a finished run", async () => {
     stubFetch(async (req) => {
@@ -34,12 +50,36 @@ describe("ReportPage", () => {
       if (path === `/api/reports/shared/${SHARE_TOKEN}`) return json(makeReport());
       return json({ error: { code: "not_found", message: "Nope." } }, 404);
     });
-    renderWithQueryClient(<ReportPage runId={RUN_ID} />);
+    renderPage(<ReportPage runId={RUN_ID} />);
 
     await waitFor(() =>
       expect(screen.getByText("Database admin key is shipped to the browser")).toBeVisible(),
     );
-    expect(screen.getByText("Fix first")).toBeVisible();
+    await waitFor(() => expect(screen.getByText("Fix first")).toBeVisible());
+    expect(screen.getByRole("button", { name: "Rerun audit" })).toBeVisible();
+    expect(screen.queryByText("Shared report, read only")).not.toBeInTheDocument();
+  });
+
+  it("shows a loading skeleton while the report loads", () => {
+    stubFetch(() => new Promise<Response>(() => {}));
+    renderPage(<ReportPage runId={RUN_ID} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Loading the report.");
+  });
+
+  it("shows an error with a retry when the report fails to load", async () => {
+    stubFetch(async () =>
+      json({ error: { code: "internal_error", message: "Something broke." } }, 500),
+    );
+    renderPage(<ReportPage runId={RUN_ID} />);
+    await waitFor(
+      () => expect(screen.getByText("The report could not be loaded")).toBeVisible(),
+      { timeout: 5000 },
+    );
+    expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "See your reports" })).toHaveAttribute(
+      "href",
+      "/reports",
+    );
   });
 
   it("shows the still-running state instead of an empty report", async () => {
@@ -52,7 +92,7 @@ describe("ReportPage", () => {
       }
       return json({ error: { code: "not_found", message: "Nope." } }, 404);
     });
-    renderWithQueryClient(<ReportPage runId={RUN_ID} />);
+    renderPage(<ReportPage runId={RUN_ID} />);
 
     await waitFor(() =>
       expect(screen.getByText(/This audit is still running/)).toBeVisible(),
@@ -67,21 +107,31 @@ describe("ReportPage", () => {
     stubFetch(async () =>
       json({ error: { code: "not_found", message: "Audit run not found." } }, 404),
     );
-    renderWithQueryClient(<ReportPage runId={RUN_ID} />);
+    renderPage(<ReportPage runId={RUN_ID} />);
 
     await waitFor(() =>
       expect(screen.getByText("This report was not found")).toBeVisible(),
+    );
+    expect(screen.getByRole("link", { name: "Run an audit" })).toHaveAttribute(
+      "href",
+      "/audits/new",
     );
   });
 });
 
 describe("SharedReportPage", () => {
-  it("renders the report by token", async () => {
+  it("renders the report by token, read only", async () => {
     stubFetch(async () => json(makeReport()));
-    renderWithQueryClient(<SharedReportPage token={SHARE_TOKEN} />);
+    renderPage(<SharedReportPage token={SHARE_TOKEN} />);
 
     await waitFor(() =>
       expect(screen.getByText("Database admin key is shipped to the browser")).toBeVisible(),
+    );
+    expect(screen.getByText("Shared report, read only")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Rerun audit" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Run your own audit" })).toHaveAttribute(
+      "href",
+      "/audits/new",
     );
   });
 
@@ -89,7 +139,7 @@ describe("SharedReportPage", () => {
     stubFetch(async () =>
       json({ error: { code: "not_found", message: "Report not found." } }, 404),
     );
-    renderWithQueryClient(<SharedReportPage token="bad-token" />);
+    renderPage(<SharedReportPage token="bad-token" />);
 
     await waitFor(() =>
       expect(screen.getByText("This report was not found")).toBeVisible(),

@@ -102,7 +102,7 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
       parts.push(
         <code
           key={`${keyPrefix}-${key}`}
-          className="rounded-sm bg-muted px-1 py-0.5 font-mono text-[0.85em]"
+          className="rounded-[5px] border bg-sunken px-1 py-px font-mono text-[0.85em]"
         >
           {token.slice(1, -1)}
         </code>,
@@ -121,22 +121,22 @@ export function Markdown({ text, className }: { text: string; className?: string
   const blocks = parseBlocks(text);
   if (blocks.length === 0) return null;
   return (
-    <div className={cn("flex flex-col gap-2 text-sm leading-relaxed", className)}>
+    <div className={cn("flex flex-col gap-2.5 text-sm leading-relaxed", className)}>
       {blocks.map((block, index) => {
         switch (block.type) {
           case "heading":
             return block.level === 2 ? (
-              <h4 key={index} className="pt-1 text-sm font-semibold">
+              <h4 key={index} className="pt-2 text-base first:pt-0">
                 {renderInline(block.text, `h${index}`)}
               </h4>
             ) : (
-              <h5 key={index} className="pt-1 text-sm font-semibold">
+              <h5 key={index} className="pt-1 text-sm font-semibold first:pt-0">
                 {renderInline(block.text, `h${index}`)}
               </h5>
             );
           case "list":
             return (
-              <ul key={index} className="flex list-disc flex-col gap-1 pl-5">
+              <ul key={index} className="flex list-disc flex-col gap-1 pl-5 marker:text-muted-foreground">
                 {block.items.map((item, itemIndex) => (
                   <li key={itemIndex}>{renderInline(item, `li${index}-${itemIndex}`)}</li>
                 ))}
@@ -146,7 +146,7 @@ export function Markdown({ text, className }: { text: string; className?: string
             return (
               <pre
                 key={index}
-                className="overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-xs leading-relaxed"
+                className="overflow-x-auto rounded-xl border bg-sunken px-3.5 py-2.5 font-mono text-[0.8125rem] leading-6"
               >
                 <code>{block.text}</code>
               </pre>

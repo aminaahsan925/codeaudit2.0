@@ -1,31 +1,36 @@
 "use client";
 
-import { RotateCcw } from "lucide-react";
+import { KeyRound, RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
+import { InfoTip } from "@/components/ui/info-tip";
+import { TERMS } from "@/lib/glossary";
 import { useRerunRun } from "@/hooks/use-run";
 import { isApiError, type RerunRequest } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const inputClasses =
-  "h-9 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "h-10 w-full rounded-[10px] border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30";
 
 /**
  * Re-runs the audit after fixes. Journey credentials and the domain token
  * are never stored by the API, so the button offers fields for fresh ones;
  * without them the rerun still re-scans the code and the live URL.
+ * `children` (other report actions) sit at the end of the button row.
  */
 export function RerunButton({
   runId,
   hasJourney,
   className,
+  children,
 }: {
   runId: string;
   /** True when the original run had journey steps (so credentials matter). */
   hasJourney: boolean;
   className?: string;
+  children?: ReactNode;
 }) {
   const router = useRouter();
   const rerun = useRerunRun();
@@ -77,58 +82,76 @@ export function RerunButton({
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex items-center gap-2">
         <Button type="button" onClick={() => void start()} disabled={starting}>
-          <RotateCcw aria-hidden="true" className="size-4" />
+          <RotateCcw aria-hidden="true" className={cn("size-4", starting && "animate-spin [animation-direction:reverse]")} />
           {starting ? "Starting rerun…" : "Rerun audit"}
         </Button>
-        <button
+        <Button
           type="button"
+          variant="ghost"
           onClick={() => setShowForm((value) => !value)}
           aria-expanded={showForm}
-          className="rounded-md text-sm font-medium text-primary underline-offset-4 hover:underline"
+          aria-controls="rerun-journey-form"
+          className="text-muted-foreground"
         >
-          {showForm ? "Hide journey login" : "Add journey login for the rerun"}
-        </button>
+          <KeyRound aria-hidden="true" className="size-4" />
+          <span className="max-sm:sr-only">
+            {showForm ? "Hide journey login" : "Add journey login"}
+          </span>
+        </Button>
+        {children ? <div className="ml-auto flex items-center gap-2">{children}</div> : null}
       </div>
 
       {showForm ? (
-        <div className="flex max-w-md flex-col gap-3 rounded-lg border bg-muted/50 p-4">
-          <p className="text-sm text-muted-foreground">
-            {hasJourney
-              ? "The last run walked the journey with a test login. That login was not stored, so enter it again to repeat the journey."
-              : "If the app needs a login for the journey (sign up, log in, cart, checkout), enter a test account. It is used once and never stored."}
-          </p>
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="rerun-journey-email" className="text-sm font-medium">
-              Journey test email
-            </label>
-            <input
-              id="rerun-journey-email"
-              type="email"
-              autoComplete="off"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className={inputClasses}
-            />
+        <div
+          id="rerun-journey-form"
+          className="flex max-h-[55vh] animate-in flex-col gap-3 overflow-y-auto rounded-xl border bg-card p-4 duration-200 fade-in-0 lg:max-h-none"
+        >
+          <div className="flex items-start gap-1">
+            <p className="text-sm text-muted-foreground">
+              {hasJourney
+                ? "The last run walked the journey with a test login. That login was not stored, so enter it again to repeat the journey."
+                : "If the app needs a login for the journey (sign up, log in, cart, checkout), enter a test account. It is used once and never stored."}
+            </p>
+            <InfoTip term={TERMS.journey.term}>{TERMS.journey.plain}</InfoTip>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="rerun-journey-email" className="text-sm font-medium">
+                Journey test email
+              </label>
+              <input
+                id="rerun-journey-email"
+                type="email"
+                autoComplete="off"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className={inputClasses}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="rerun-journey-password" className="text-sm font-medium">
+                Journey test password
+              </label>
+              <input
+                id="rerun-journey-password"
+                type="password"
+                autoComplete="off"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className={inputClasses}
+              />
+            </div>
           </div>
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="rerun-journey-password" className="text-sm font-medium">
-              Journey test password
-            </label>
-            <input
-              id="rerun-journey-password"
-              type="password"
-              autoComplete="off"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className={inputClasses}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="rerun-domain-token" className="text-sm font-medium">
-              Domain verification token <span className="text-muted-foreground">(optional)</span>
-            </label>
+            <div className="flex items-center gap-0.5">
+              <label htmlFor="rerun-domain-token" className="text-sm font-medium">
+                Domain verification token{" "}
+                <span className="font-normal text-muted-foreground">(optional)</span>
+              </label>
+              <InfoTip term={TERMS.domainToken.term}>{TERMS.domainToken.plain}</InfoTip>
+            </div>
             <input
               id="rerun-domain-token"
               type="text"

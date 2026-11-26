@@ -3,11 +3,11 @@ import { SEVERITY_LABEL, type Severity } from "@/lib/report";
 
 const tone: Record<Severity, string> = {
   critical:
-    "bg-sev-critical-tint text-sev-critical-fg border-sev-critical/40 [--mark:var(--sev-critical)]",
-  high: "bg-sev-high-tint text-sev-high-fg border-sev-high/40 [--mark:var(--sev-high)]",
+    "bg-sev-critical-tint text-sev-critical-fg border-sev-critical/25 [--mark:var(--sev-critical)]",
+  high: "bg-sev-high-tint text-sev-high-fg border-sev-high/25 [--mark:var(--sev-high)]",
   medium:
-    "bg-sev-medium-tint text-sev-medium-fg border-sev-medium/40 [--mark:var(--sev-medium)]",
-  low: "bg-sev-low-tint text-sev-low-fg border-sev-low/40 [--mark:var(--sev-low)]",
+    "bg-sev-medium-tint text-sev-medium-fg border-sev-medium/25 [--mark:var(--sev-medium)]",
+  low: "bg-sev-low-tint text-sev-low-fg border-sev-low/25 [--mark:var(--sev-low)]",
 };
 
 /**

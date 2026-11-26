@@ -50,10 +50,12 @@ test.describe("report page", () => {
       page.getByRole("heading", { level: 1, name: "pocket-notes" }),
     ).toBeVisible();
     await expect(page.getByText("Fix first", { exact: true })).toBeVisible();
-    await expect(page.getByText("4.3")).toBeVisible();
+    await expect(page.getByText("Risk score: 4.3 out of 10")).toBeAttached();
+    await expect(page.getByText("4.3", { exact: true }).first()).toBeVisible();
     await expect(
-      page.getByText("2 findings, most damaging first."),
+      page.getByText("2 problems, most serious first."),
     ).toBeVisible();
+    await expect(page.getByRole("button", { name: "What is Risk score?" })).toBeVisible();
     await expect(
       page.getByText("Database admin key is shipped to the browser"),
     ).toBeVisible();
@@ -72,8 +74,9 @@ test.describe("report page", () => {
     ).toBeVisible();
     await page.getByRole("button", { name: "Show proof" }).first().click();
 
-    await expect(page.getByText("Code")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Code", exact: true })).toBeVisible();
     await expect(page.getByText(/const adminKey/)).toBeVisible();
+    await page.getByRole("tab", { name: "How to fix" }).click();
     await expect(page.getByRole("heading", { name: "Why it matters" })).toBeVisible();
   });
 
@@ -81,6 +84,7 @@ test.describe("report page", () => {
     await mockReport(page);
     await page.goto(`/reports/${RUN_ID}`);
 
+    await page.getByRole("button", { name: "Share" }).click();
     const shareInput = page.getByLabel("Share link");
     await expect(shareInput).toHaveValue(`http://localhost:3000/r/${SHARE_TOKEN}`);
     await expect(page.getByRole("link", { name: "Download PDF" })).toHaveAttribute(
@@ -123,6 +127,9 @@ test.describe("shared report page", () => {
     await expect(
       page.getByText("Database admin key is shipped to the browser"),
     ).toBeVisible();
+    await expect(page.getByText("Shared report, read only")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Rerun audit" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Run your own audit" })).toBeVisible();
     expect(runEndpointCalled).toBe(false);
   });
 

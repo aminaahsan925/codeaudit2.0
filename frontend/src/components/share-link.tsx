@@ -64,7 +64,7 @@ export function ShareLink({
 
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      <label htmlFor="share-link-input" className="text-sm font-medium">
+      <label htmlFor="share-link-input" className="text-sm font-medium text-muted-foreground">
         {label}
       </label>
       <div className="flex gap-2">
@@ -75,9 +75,9 @@ export function ShareLink({
           readOnly
           value={url}
           onFocus={(event) => event.currentTarget.select()}
-          className="h-9 min-w-0 flex-1 rounded-md border border-input bg-muted px-3 font-mono text-xs text-muted-foreground outline-none"
+          className="h-9 min-w-0 flex-1 rounded-[10px] border bg-sunken px-3 font-mono text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
         />
-        <Button type="button" variant="outline" onClick={() => void copy()}>
+        <Button type="button" onClick={() => void copy()} className="min-w-28">
           {copied ? (
             <>
               <Check aria-hidden="true" className="size-4" />
