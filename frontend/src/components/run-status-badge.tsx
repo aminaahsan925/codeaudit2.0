@@ -20,7 +20,7 @@ const config: Record<
   },
   running: {
     icon: LoaderCircle,
-    tone: "bg-muted text-foreground border-border",
+    tone: "bg-brand-soft text-brand-fg border-brand/30",
     spin: true,
   },
   succeeded: {
@@ -56,7 +56,7 @@ export function RunStatusBadge({
     >
       <Icon
         aria-hidden="true"
-        className={cn("size-3.5 shrink-0", spin && "animate-spin")}
+        className={cn("size-3.5 shrink-0", spin && "motion-safe:animate-spin")}
       />
       {RUN_STATUS_LABEL[status]}
     </span>
