@@ -215,7 +215,12 @@ def test_settings_are_cached(clean_env: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.parametrize("path", ["/api/docs", "/api/openapi.json"])
 def test_production_disables_docs_and_schema(make_client: MakeClient, path: str) -> None:
-    client = make_client(environment="production", cors_origins=["https://app.example.com"])
+    client = make_client(
+        environment="production",
+        cors_origins=["https://app.example.com"],
+        frontend_url="https://app.example.com",
+        session_secret="test-session-secret-for-production-tests",  # noqa: S106 - test value
+    )
 
     response = client.get(path)
 
@@ -229,13 +234,23 @@ def test_development_serves_docs_and_schema(make_client: MakeClient, path: str) 
 
 
 def test_production_app_still_serves_the_api(make_client: MakeClient) -> None:
-    client = make_client(environment="production", cors_origins=["https://app.example.com"])
+    client = make_client(
+        environment="production",
+        cors_origins=["https://app.example.com"],
+        frontend_url="https://app.example.com",
+        session_secret="test-session-secret-for-production-tests",  # noqa: S106 - test value
+    )
 
     assert client.get("/api/health").status_code == 200
 
 
 def test_production_cors_only_allows_configured_origins(make_client: MakeClient) -> None:
-    client = make_client(environment="production", cors_origins=["https://app.example.com"])
+    client = make_client(
+        environment="production",
+        cors_origins=["https://app.example.com"],
+        frontend_url="https://app.example.com",
+        session_secret="test-session-secret-for-production-tests",  # noqa: S106 - test value
+    )
 
     allowed = client.get("/api/health", headers={"Origin": "https://app.example.com"})
     other = client.get("/api/health", headers={"Origin": "https://evil.example.com"})

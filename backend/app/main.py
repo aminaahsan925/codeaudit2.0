@@ -9,7 +9,7 @@ import logging
 from fastapi import FastAPI
 
 from app.api.routers import auth, health, reports, runs
-from app.core.config import Settings, get_settings
+from app.core.config import Settings, get_settings, validate_startup_config
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.security import (
@@ -33,6 +33,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     """Build the API. Raises `SettingsError` if the configuration is invalid."""
     settings = settings or get_settings()
     configure_logging(settings.log_level)
+    validate_startup_config(settings)
 
     production = settings.is_production
     app = FastAPI(

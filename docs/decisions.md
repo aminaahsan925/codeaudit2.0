@@ -67,6 +67,19 @@ when a decision changes (say what replaced it and why).
 - **No fail-open defaults**: `ENVIRONMENT` has no default, so a deployment
   that forgets it refuses to start instead of silently running in development
   mode (public API docs, no HSTS).
+- **Sign-in never fails silently**: `validate_startup_config` runs in the app
+  factory. Production refuses to start without `SESSION_SECRET`, with a
+  non-HTTPS `FRONTEND_URL` or `CORS_ORIGINS` entry, or with a non-HTTPS
+  `GOOGLE_REDIRECT_URI`; other environments log a loud warning that sign-in
+  is disabled when `SESSION_SECRET` is unset. The Google OAuth callback is a
+  browser navigation, so its failures redirect to the frontend sign-in page
+  (`/sign-in?error=google_failed`) instead of returning a JSON error page.
+- **Rate limits live in the database**: audit-run counters are rows in
+  `rate_limit_counters`, incremented with one atomic upsert per attempt, so
+  limits survive restarts and are shared across instances. Callers are keyed
+  `user:<id>` when signed in (bearer token first, then the session cookie,
+  decoded exactly as auth decodes them), `token:<token>` for the development
+  token stub, and `ip:<address>` only for true guests.
 - **App factory**: the backend runs with
   `uvicorn app.main:create_app --factory`; there is no module-level app, so
   importing the code never reads the environment. Tests and the OpenAPI export

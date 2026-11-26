@@ -63,16 +63,6 @@ def _check_journey_credentials(journey_email: str | None, journey_password: str 
         raise AppError("Provide both a journey email and password, or neither.")
 
 
-def _rate_limit_token(
-    principal: object | None,
-    credentials: HTTPAuthorizationCredentials | None,
-) -> str | None:
-    """The rate-limit key's token half: the bearer token when authenticated."""
-    if principal is None or credentials is None:
-        return None
-    return credentials.credentials
-
-
 @router.post(
     "",
     status_code=201,
@@ -102,7 +92,7 @@ async def create_run(
         raise AppError("The uploaded file must be a .zip file.")
     _check_journey_credentials(journey_email, journey_password)
     # Rate limit after validation, so bad requests do not consume quota.
-    enforce_audit_rate_limit(request, settings, _rate_limit_token(principal, credentials))
+    enforce_audit_rate_limit(request, settings, session, principal, credentials)
 
     run_id = uuid4()
     run = AuditRun(
@@ -174,7 +164,7 @@ async def rerun_run(
         raise UnauthorizedError("Missing or invalid bearer token.")
     rerun = payload or RerunRequest()
     _check_journey_credentials(rerun.journey_email, rerun.journey_password)
-    enforce_audit_rate_limit(request, settings, _rate_limit_token(principal, credentials))
+    enforce_audit_rate_limit(request, settings, session, principal, credentials)
 
     new_id = uuid4()
     new_run = AuditRun(
