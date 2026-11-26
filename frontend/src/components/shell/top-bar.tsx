@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { Breadcrumbs } from "./breadcrumbs";
 import { Kbd } from "./kbd";
 import { MobileNav } from "./mobile-nav";
-import { ProfileMenu } from "./profile-menu";
+import { AuthControls } from "@/components/auth-controls";
 import { useModifierLabel, useShell } from "./shell-context";
 
 function SearchButton() {
@@ -72,7 +72,7 @@ export function TopBar() {
         <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-1.5">
           <SearchButton />
           <ThemeToggle />
-          <ProfileMenu />
+          <AuthControls />
         </div>
       </div>
     </header>

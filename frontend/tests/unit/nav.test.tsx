@@ -6,7 +6,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Breadcrumbs } from "@/components/shell/breadcrumbs";
 import { CommandPalette } from "@/components/shell/command-palette";
 import { MobileNav } from "@/components/shell/mobile-nav";
-import { ProfileMenu } from "@/components/shell/profile-menu";
 import { ShellProvider, SIDEBAR_STORAGE_KEY } from "@/components/shell/shell-context";
 import { Sidebar } from "@/components/shell/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -205,21 +204,6 @@ describe("Breadcrumbs", () => {
   it("renders nothing on the home page", () => {
     render(<Breadcrumbs />);
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
-  });
-});
-
-describe("ProfileMenu", () => {
-  it("shows Guest with sign-in disabled", async () => {
-    const user = userEvent.setup();
-    renderInShell(<ProfileMenu />);
-    await user.click(screen.getByRole("button", { name: "Guest account" }));
-
-    const menu = await screen.findByRole("menu");
-    expect(within(menu).getByText("Guest")).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: "Sign in (coming soon)" })).toHaveAttribute(
-      "aria-disabled",
-      "true",
-    );
   });
 });
 

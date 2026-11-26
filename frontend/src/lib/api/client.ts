@@ -11,11 +11,17 @@ import {
 
 export const DEFAULT_TIMEOUT_MS = 10_000;
 
-/** Low-level typed client. Prefer the per-resource helpers (e.g. getHealth). */
+/**
+ * Low-level typed client. Prefer the per-resource helpers (e.g. getHealth).
+ *
+ * `credentials: "include"` sends the HttpOnly session cookie with every
+ * call, including cross-origin ones to the API. No Authorization header is
+ * ever set here: the token lives in the cookie, out of JavaScript's reach.
+ */
 export const apiClient = createClient<paths>({
   baseUrl: env.NEXT_PUBLIC_API_BASE_URL,
   headers: { Accept: "application/json" },
-  credentials: "omit",
+  credentials: "include",
   // Resolve fetch per call so tests and instrumentation can replace it.
   fetch: (request: Request) => globalThis.fetch(request),
 });

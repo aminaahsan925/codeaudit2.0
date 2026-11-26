@@ -81,6 +81,9 @@ export function MarketingHeader() {
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />
+          <ButtonLink href="/sign-in" variant="ghost" className="hidden md:inline-flex">
+            Sign in
+          </ButtonLink>
           <ButtonLink href="/reports" variant="ghost" className="hidden sm:inline-flex">
             Open app
           </ButtonLink>
@@ -125,6 +128,15 @@ export function MarketingHeader() {
                 className="flex h-12 items-center rounded-lg px-2 text-base font-medium hover:bg-muted"
               >
                 Open app
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/sign-in"
+                onClick={() => setOpen(false)}
+                className="flex h-12 items-center rounded-lg px-2 text-base font-medium hover:bg-muted"
+              >
+                Sign in
               </Link>
             </li>
           </ul>

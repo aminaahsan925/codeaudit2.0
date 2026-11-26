@@ -53,7 +53,7 @@ describe("getHealth", () => {
     const req = fetchMock.mock.calls[0]![0];
     expect(new URL(req.url).pathname).toBe("/api/health");
     expect(req.method).toBe("GET");
-    expect(req.credentials).toBe("omit");
+    expect(req.credentials).toBe("include");
   });
 
   it("turns a backend error envelope into an ApiError", async () => {
@@ -107,11 +107,15 @@ describe("getHealth", () => {
   });
 
   it("reports caller cancellation as aborted, not timeout", async () => {
-    stubFetch(async (req) => neverResolving(req));
+    const fetchMock = stubFetch(async (req) => neverResolving(req));
     const controller = new AbortController();
     const pending = catchError(
       getHealth({ signal: controller.signal, timeoutMs: 5_000 }),
     );
+    // Wait until the request is in flight before aborting: the client
+    // setup yields a microtask before fetch runs, so an immediate abort
+    // can land before the stub attaches its abort listener.
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
     controller.abort();
     const err = await pending;
     expect(err.code).toBe("aborted");

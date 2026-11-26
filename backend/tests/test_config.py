@@ -43,6 +43,11 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
         "GEMINI_API_KEY",
         "GROQ_API_KEY",
         "AUDIT_RATE_LIMIT_PER_HOUR",
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "GOOGLE_REDIRECT_URI",
+        "SESSION_SECRET",
+        "FRONTEND_URL",
     ):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("ENVIRONMENT", "test")
@@ -345,6 +350,38 @@ def test_production_reports_all_rule_violations(settings_factory: SettingsFactor
     assert TOKEN_SECRET not in message
 
 
+def test_production_google_without_session_secret_is_rejected(
+    settings_factory: SettingsFactory,
+) -> None:
+    """Google configured but no session secret means sign-in is silently
+    unavailable in production, so the app must refuse to start."""
+    with pytest.raises(ValidationError) as excinfo:
+        settings_factory(
+            environment="production",
+            google_client_id="id.apps.googleusercontent.com",
+            google_client_secret="google-client-secret-0123456789abcdef",  # noqa: S106
+            google_redirect_uri="https://api.example.com/auth/google/callback",
+            session_secret=None,
+        )
+
+    assert "SESSION_SECRET must be set in production" in str(excinfo.value)
+
+
+def test_production_google_with_session_secret_is_accepted(
+    settings_factory: SettingsFactory,
+) -> None:
+    settings = settings_factory(
+        environment="production",
+        google_client_id="id.apps.googleusercontent.com",
+        google_client_secret="google-client-secret-0123456789abcdef",  # noqa: S106
+        google_redirect_uri="https://api.example.com/auth/google/callback",
+        session_secret="session-secret-0123456789abcdef0123456789",  # noqa: S106
+    )
+
+    assert settings.is_production is True
+    assert settings.google_configured is True
+
+
 def test_explicit_settings_ignore_the_environment(
     clean_env: pytest.MonkeyPatch, settings_factory: SettingsFactory
 ) -> None:
@@ -433,3 +470,59 @@ def test_non_positive_audit_rate_limit_is_rejected(clean_env: pytest.MonkeyPatch
 
     with pytest.raises(SettingsError, match="AUDIT_RATE_LIMIT_PER_HOUR"):
         get_settings()
+
+
+def test_google_settings_default_to_unconfigured(settings_factory: SettingsFactory) -> None:
+    settings = settings_factory()
+
+    assert settings.google_client_id is None
+    assert settings.google_client_secret is None
+    assert settings.google_redirect_uri is None
+    assert settings.session_secret is None
+    assert settings.frontend_url == "http://localhost:3000"
+    assert settings.google_configured is False
+    assert settings.sessions_available is False
+
+
+def test_google_configured_only_when_all_three_values_set(
+    settings_factory: SettingsFactory,
+) -> None:
+    base = {
+        "google_client_id": "client-id.apps.googleusercontent.com",
+        "google_client_secret": "google-client-secret-value",
+        "google_redirect_uri": "http://localhost:8000/auth/google/callback",
+    }
+    assert settings_factory(**base).google_configured is True
+    for missing in base:
+        partial = {key: value for key, value in base.items() if key != missing}
+        assert settings_factory(**partial).google_configured is False
+
+
+def test_blank_google_values_are_unset(clean_env: pytest.MonkeyPatch) -> None:
+    clean_env.setenv("DATABASE_URL", VALID_DB_URL)
+    clean_env.setenv("GOOGLE_CLIENT_ID", "   ")
+    clean_env.setenv("GOOGLE_CLIENT_SECRET", "")
+    clean_env.setenv("GOOGLE_REDIRECT_URI", " ")
+    clean_env.setenv("SESSION_SECRET", "")
+
+    settings = get_settings()
+
+    assert settings.google_client_id is None
+    assert settings.google_client_secret is None
+    assert settings.google_redirect_uri is None
+    assert settings.session_secret is None
+
+
+def test_short_session_secret_is_rejected(settings_factory: SettingsFactory) -> None:
+    with pytest.raises(ValidationError, match="must be at least 32 characters long"):
+        settings_factory(session_secret="x" * 31)
+
+    assert settings_factory(session_secret="x" * 32).sessions_available is True
+
+
+def test_frontend_url_must_be_absolute_http_url(settings_factory: SettingsFactory) -> None:
+    with pytest.raises(ValidationError, match="must be an absolute http"):
+        settings_factory(frontend_url="app.example.com")
+
+    settings = settings_factory(frontend_url="https://app.example.com/")
+    assert settings.frontend_url == "https://app.example.com"
