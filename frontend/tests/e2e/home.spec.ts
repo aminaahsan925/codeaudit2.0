@@ -23,19 +23,22 @@ test.describe("landing page", () => {
     await page.goto("/");
 
     await expect(
-      page.getByRole("heading", { level: 1, name: "Check your app before you launch it." }),
+      page.getByRole("heading", { level: 1, name: "Find out if your app is safe to launch." }),
     ).toBeVisible();
+    await expect(page.getByRole("figure", { name: /a fictional app\.$/ })).toBeVisible();
 
-    await page.getByRole("link", { name: "Run an audit" }).first().click();
+    const hero = page.getByRole("region", { name: "Find out if your app is safe to launch." });
+    await hero.getByRole("link", { name: "Run an audit" }).click();
     await expect(page).toHaveURL(/\/audits\/new$/);
     await expect(page.getByRole("heading", { level: 1, name: "Run an audit" })).toBeVisible();
   });
 });
 
 test.describe("API health badge", () => {
+  // The badge lives in the app sidebar; the marketing page does not show it.
   test("shows online when the API reports ok", async ({ page }) => {
     await mockHealthOk(page);
-    await page.goto("/");
+    await page.goto("/reports");
 
     await expect(page.getByRole("button", { name: "API online" })).toBeVisible();
     await expect(page.getByRole("status")).toHaveText("LaunchAudit API online");
@@ -52,7 +55,7 @@ test.describe("API health badge", () => {
         }),
       }),
     );
-    await page.goto("/");
+    await page.goto("/reports");
 
     await expect(page.getByRole("button", { name: "API offline" })).toBeVisible({
       timeout: 15_000,
@@ -62,7 +65,7 @@ test.describe("API health badge", () => {
 
   test("shows offline when the request is aborted", async ({ page }) => {
     await page.route("**/api/health", (route) => route.abort("connectionrefused"));
-    await page.goto("/");
+    await page.goto("/reports");
 
     await expect(page.getByRole("button", { name: "API offline" })).toBeVisible({
       timeout: 15_000,
@@ -71,11 +74,15 @@ test.describe("API health badge", () => {
 });
 
 test.describe("navigation", () => {
-  test("desktop nav goes to Reports and marks it current", async ({ page }) => {
+  test("sidebar goes to Reports and marks it current", async ({ page }) => {
     await mockHealthOk(page);
-    await page.goto("/");
+    await page.goto("/audits/new");
 
     const nav = page.getByRole("navigation", { name: "Main" });
+    await expect(nav.getByRole("link", { name: "New audit" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
     await nav.getByRole("link", { name: "Reports" }).click();
 
     await expect(page).toHaveURL(/\/reports$/);
@@ -84,6 +91,43 @@ test.describe("navigation", () => {
       "aria-current",
       "page",
     );
+    await expect(
+      page.getByRole("navigation", { name: "Breadcrumb" }).getByText("Reports"),
+    ).toHaveAttribute("aria-current", "page");
+  });
+
+  test("sidebar collapses to a rail and stays collapsed after reload", async ({ page }) => {
+    await mockHealthOk(page);
+    await page.goto("/reports");
+
+    await page.getByRole("button", { name: "Collapse sidebar" }).click();
+    const expand = page.getByRole("button", { name: "Expand sidebar" });
+    await expect(expand).toBeVisible();
+    await expect(
+      page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Reports" }),
+    ).toHaveAttribute("aria-current", "page");
+
+    await page.reload();
+    await expect(expand).toBeVisible();
+    await expand.click();
+    await expect(page.getByRole("button", { name: "Collapse sidebar" })).toBeVisible();
+  });
+
+  test("command palette opens with the keyboard and navigates", async ({ page }) => {
+    await mockHealthOk(page);
+    await page.goto("/audits/new");
+
+    await page.keyboard.press("ControlOrMeta+k");
+    const dialog = page.getByRole("dialog", { name: "Search" });
+    await expect(dialog).toBeVisible();
+
+    const input = dialog.getByRole("combobox", { name: "Search actions and reports" });
+    await expect(input).toBeFocused();
+    await input.fill("reports");
+    await page.keyboard.press("Enter");
+
+    await expect(page).toHaveURL(/\/reports$/);
+    await expect(dialog).toBeHidden();
   });
 
   test.describe("mobile viewport", () => {
@@ -91,11 +135,9 @@ test.describe("navigation", () => {
 
     test("opens the menu and navigates", async ({ page }) => {
       await mockHealthOk(page);
-      await page.goto("/");
+      await page.goto("/audits/new");
 
-      await expect(
-        page.getByRole("banner").getByRole("link", { name: "Reports" }),
-      ).toBeHidden();
+      await expect(page.getByRole("navigation", { name: "Main" })).toBeHidden();
       await page.getByRole("button", { name: "Open menu" }).click();
 
       const dialog = page.getByRole("dialog");
@@ -112,7 +154,7 @@ test.describe("navigation", () => {
 test.describe("theme", () => {
   test("toggle switches the dark class on html", async ({ page }) => {
     await mockHealthOk(page);
-    await page.goto("/");
+    await page.goto("/reports");
 
     const html = page.locator("html");
     await expect(html).not.toHaveClass(/(^|\s)dark(\s|$)/);
