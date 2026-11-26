@@ -19,8 +19,11 @@ COPY --from=uv /uv /usr/local/bin/uv
 # System tools the app needs at runtime:
 # - git: cloning GitHub repos for code scans (GitHub URL audits fail without it)
 # - curl + ca-certificates: downloading the scanner binaries below
+# - libatomic1: the Playwright driver (a Node binary) needs libatomic.so.1
+#   just to start; without it `playwright install --with-deps` dies before
+#   it can install Chromium's own dependencies.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates git \
+    && apt-get install -y --no-install-recommends curl ca-certificates git libatomic1 \
     && rm -rf /var/lib/apt/lists/*
 
 # External scanners, pinned and verified by checksum. gitleaks matches the
