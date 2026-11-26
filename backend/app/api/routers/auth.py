@@ -57,9 +57,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 def _sign_in_failed(settings: Settings) -> RedirectResponse:
     """Send the browser back to the frontend sign-in page after a failed or
     cancelled Google sign-in, instead of showing a raw API error page."""
-    return RedirectResponse(
-        f"{settings.frontend_url}/sign-in?error=google_failed", status_code=302
-    )
+    return RedirectResponse(f"{settings.frontend_url}/sign-in?error=google_failed", status_code=302)
 
 
 def _user_response(user: User) -> UserResponse:
