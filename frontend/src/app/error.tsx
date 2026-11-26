@@ -4,7 +4,8 @@ import { TriangleAlert } from "lucide-react";
 import { useEffect } from "react";
 
 import { ButtonLink } from "@/components/button-link";
-import { EmptyState } from "@/components/empty-state";
+import { AppShell } from "@/components/shell/app-shell";
+import { StatusPage } from "@/components/shell/status-page";
 import { Button } from "@/components/ui/button";
 
 export default function RouteError({
@@ -23,33 +24,30 @@ export default function RouteError({
       ? error.digest
       : null;
 
+  // The root error boundary replaces the route group layout, so it renders
+  // the app shell itself.
   return (
-    <div className="container-page py-10 sm:py-14">
-      <EmptyState
+    <AppShell>
+      <StatusPage
         icon={TriangleAlert}
-        title="This page failed to load"
-        headingLevel={2}
+        title="This page did not load"
+        reference={digest}
         actions={
           <>
             <Button type="button" size="lg" onClick={() => retry()}>
               Try again
             </Button>
-            <ButtonLink href="/" size="lg" variant="outline">
-              Go to home
+            <ButtonLink href="/reports" size="lg" variant="outline">
+              View reports
             </ButtonLink>
           </>
         }
       >
         <p role="alert">
-          Something went wrong while rendering this page. Try again, and if it
-          keeps failing, check that the LaunchAudit API is running.
+          Something broke while this page was loading. Try again. If it keeps
+          failing, check that the LaunchAudit API is running.
         </p>
-        {digest ? (
-          <p className="mt-2 text-sm">
-            Reference: <code className="font-mono">{digest}</code>
-          </p>
-        ) : null}
-      </EmptyState>
-    </div>
+      </StatusPage>
+    </AppShell>
   );
 }

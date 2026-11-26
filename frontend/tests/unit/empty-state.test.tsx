@@ -2,8 +2,8 @@ import { render, screen } from "@testing-library/react";
 import { Inbox } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
 
-import NewAuditPage from "@/app/audits/new/page";
-import ReportsPage from "@/app/reports/page";
+import NewAuditPage from "@/app/(app)/audits/new/page";
+import ReportsPage from "@/app/(app)/reports/page";
 import { EmptyState } from "@/components/empty-state";
 
 import { renderWithQueryClient } from "./test-utils";
@@ -57,15 +57,25 @@ describe("empty pages", () => {
       "href",
       "/audits/new",
     );
+    expect(screen.getByRole("link", { name: "See an example report" })).toHaveAttribute(
+      "href",
+      "/#example",
+    );
   });
 
-  it("/audits/new shows the audit form", () => {
+  it("/audits/new shows the audit form on its first step", () => {
     renderWithQueryClient(<NewAuditPage />);
     expect(
       screen.getByRole("heading", { level: 1, name: "Run an audit" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Audit steps" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 2, name: /Your code/ }),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText("Project name")).toBeInTheDocument();
     expect(screen.getByLabelText("GitHub repo URL")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Run audit" })).toBeInTheDocument();
+    // Run audit lives on the Review step; the first step moves on with Next.
+    expect(screen.getByRole("button", { name: "Next" })).toHaveAttribute("type", "submit");
+    expect(screen.queryByRole("button", { name: "Run audit" })).not.toBeInTheDocument();
   });
 });

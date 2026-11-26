@@ -17,7 +17,7 @@ export function ThemeToggle() {
       type="button"
       variant="ghost"
       size="icon"
-      className="size-9"
+      className="size-9 rounded-[10px] text-muted-foreground hover:bg-sunken hover:text-foreground"
       onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
     >
       <Moon aria-hidden="true" className="size-[18px] dark:hidden" />

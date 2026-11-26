@@ -18,15 +18,10 @@ const label: Record<HealthState, string> = {
   offline: "API offline",
 };
 
-const shortLabel: Record<HealthState, string> = {
-  checking: "Checking",
-  online: "Online",
-  offline: "Offline",
-};
-
+/* Calm while healthy; only the offline state takes a tint. */
 const tone: Record<HealthState, string> = {
-  checking: "border-border text-muted-foreground",
-  online: "border-verdict-launch/45 bg-verdict-launch-tint text-verdict-launch-fg",
+  checking: "border-border bg-card text-muted-foreground",
+  online: "border-border bg-card text-foreground hover:border-input",
   offline: "border-verdict-block/45 bg-verdict-block-tint text-verdict-block-fg",
 };
 
@@ -44,7 +39,7 @@ function StatusMark({ state }: { state: HealthState }) {
     return (
       <span
         aria-hidden="true"
-        className="size-2 shrink-0 rounded-full bg-verdict-launch"
+        className="size-2 shrink-0 rounded-full bg-verdict-launch shadow-[0_0_0_3px_color-mix(in_oklab,var(--verdict-launch)_18%,transparent)]"
       />
     );
   }
@@ -60,7 +55,19 @@ function StatusMark({ state }: { state: HealthState }) {
   );
 }
 
-export function HealthBadge({ className }: { className?: string }) {
+/**
+ * API status chip. `compact` shows only the status mark (the sidebar rail);
+ * the accessible name and description stay the same.
+ */
+export function HealthBadge({
+  className,
+  compact = false,
+  side = "bottom",
+}: {
+  className?: string;
+  compact?: boolean;
+  side?: "top" | "bottom" | "right";
+}) {
   const detailId = useId();
   const { status, data, error, refetch, isFetching } = useHealth();
   const state: HealthState =
@@ -86,7 +93,8 @@ export function HealthBadge({ className }: { className?: string }) {
               aria-label={label[state]}
               aria-describedby={detailId}
               className={cn(
-                "inline-flex h-8 items-center gap-2 rounded-md border px-2.5 text-xs font-semibold whitespace-nowrap",
+                "inline-flex h-8 items-center gap-2 rounded-[8px] border text-xs font-medium whitespace-nowrap shadow-xs transition-colors",
+                compact ? "w-8 justify-center px-0" : "px-2.5",
                 tone[state],
                 className,
               )}
@@ -94,10 +102,11 @@ export function HealthBadge({ className }: { className?: string }) {
           }
         >
           <StatusMark state={state} />
-          <span className="sm:hidden">{shortLabel[state]}</span>
-          <span className="hidden sm:inline">{label[state]}</span>
+          {compact ? null : (
+            <span>{label[state]}</span>
+          )}
         </TooltipTrigger>
-        <TooltipContent side="bottom" className="max-w-64 text-left">
+        <TooltipContent side={side} sideOffset={8} className="max-w-64 text-left">
           {detail} {state !== "checking" && "Select to check now."}
         </TooltipContent>
       </Tooltip>
