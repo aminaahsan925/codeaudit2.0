@@ -1,10 +1,31 @@
 "use client";
 
 import { TriangleAlert } from "lucide-react";
+import * as m from "motion/react-m";
 import { useRouter } from "next/navigation";
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 
+import { CodeStep, type CodeSource } from "@/components/audit-form/code-step";
+import { LiveSiteStep } from "@/components/audit-form/live-site-step";
+import { ReviewStep } from "@/components/audit-form/review-step";
+import { Stepper } from "@/components/audit-form/stepper";
+import {
+  firstStepWithError,
+  REVIEW_INDEX,
+  STEPS,
+  type FieldName,
+  type StepStatus,
+} from "@/components/audit-form/steps";
+import { TestLoginStep } from "@/components/audit-form/test-login-step";
 import { Button } from "@/components/ui/button";
+import { EASE_OUT } from "@/components/ui/motion";
 import { useCreateRun } from "@/hooks/use-run";
 import { isApiError, type CreateRunInput } from "@/lib/api";
 import {
@@ -13,62 +34,209 @@ import {
   type AuditFormErrors,
   type AuditFormValues,
 } from "@/lib/audit-form";
-import { cn } from "@/lib/utils";
 
-const inputClasses =
-  "h-10 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60";
+/** The input that shows each field's error, for moving focus to it. */
+const FIELD_INPUT_ID: Record<FieldName, string> = {
+  projectName: "project-name",
+  repoUrl: "repo-url",
+  zipFile: "zip-file",
+  liveUrl: "live-url",
+  domainToken: "domain-token",
+  journeyEmail: "journey-email",
+  journeyPassword: "journey-password",
+};
 
-const labelClasses = "text-sm font-medium";
+/** Keeps the field from losing focus on press, so a blur error cannot shift the button away. */
+function keepFocus(event: MouseEvent) {
+  event.preventDefault();
+}
 
-function FieldError({ message, id }: { message?: string; id: string }) {
-  if (!message) return null;
+function isEmpty(value: AuditFormValues[FieldName]): boolean {
+  return value === null || (typeof value === "string" && value.trim() === "");
+}
+
+/** One step: its heading (focused when the step opens) and help line. */
+function StepPanel({
+  index,
+  focusOnMount,
+  children,
+}: {
+  index: number;
+  focusOnMount: boolean;
+  children: ReactNode;
+}) {
+  const step = STEPS[index]!;
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    if (focusOnMount) headingRef.current?.focus();
+  }, [focusOnMount]);
+
   return (
-    <p id={id} role="alert" className="text-sm text-sev-critical-fg">
-      {message}
-    </p>
+    <section aria-labelledby={`step-${step.id}-heading`} className="flex flex-col gap-7">
+      <header className="flex flex-col gap-1.5">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h2
+            ref={headingRef}
+            id={`step-${step.id}-heading`}
+            tabIndex={-1}
+            className="scroll-mt-24 rounded-[6px] text-2xl text-foreground"
+          >
+            <span className="sr-only">
+              Step {index + 1} of {STEPS.length}:{" "}
+            </span>
+            {step.title}
+          </h2>
+          {step.optional ? (
+            <span className="rounded-[6px] border border-border bg-sunken px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              Optional
+            </span>
+          ) : null}
+        </div>
+        <p className="text-base text-muted-foreground">{step.help}</p>
+      </header>
+      {children}
+    </section>
   );
 }
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 /**
- * The new-audit form: project name, code (GitHub repo or zip), live URL,
- * journey login and domain token. Submitting starts the run and moves to
- * the run page. No account is needed; the run is reachable from its link.
+ * The new-audit form as four steps: code, live site, test login, review.
+ * Only the code is required. Errors show when a field loses focus or on
+ * Next, never while typing. Submitting from Review starts the run and moves
+ * to the run page. No account is needed; the run is reachable from its link.
  */
 export function AuditForm() {
   const router = useRouter();
   const createRun = useCreateRun();
   const [values, setValues] = useState<AuditFormValues>(EMPTY_AUDIT_FORM);
   const [errors, setErrors] = useState<AuditFormErrors>({});
-  const [attempted, setAttempted] = useState(false);
+  const [touched, setTouched] = useState<ReadonlySet<FieldName>>(() => new Set());
+  const [step, setStep] = useState(0);
+  const [furthest, setFurthest] = useState(0);
+  const [outcomes, setOutcomes] = useState<Partial<Record<number, "done" | "skipped">>>({});
+  const [direction, setDirection] = useState<1 | -1>(1);
+  const [navigated, setNavigated] = useState(false);
+  const [source, setSource] = useState<CodeSource>("repo");
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
-  function setValue<K extends keyof AuditFormValues>(
-    key: K,
-    value: AuditFormValues[K],
-  ) {
-    const next = { ...values, [key]: value };
-    setValues(next);
-    if (attempted) setErrors(validateAuditForm(next));
+  const current = STEPS[step]!;
+  const isReview = step === REVIEW_INDEX;
+
+  /** Shows the current errors for `fields` (and clears fixed ones); returns the invalid fields. */
+  function reveal(fields: readonly FieldName[], from: AuditFormValues): FieldName[] {
+    const all = validateAuditForm(from);
+    setErrors((prev) => {
+      const next = { ...prev };
+      for (const field of fields) {
+        if (all[field]) next[field] = all[field];
+        else delete next[field];
+      }
+      return next;
+    });
+    return fields.filter((field) => all[field]);
   }
 
-  function onZipChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
-    setValue("zipFile", file);
+  function setValue<K extends FieldName>(key: K, value: AuditFormValues[K]) {
+    const next = { ...values, [key]: value };
+    setValues(next);
+    if (key === "zipFile") {
+      // Picking a file is one action, not typing: check it straight away.
+      setTouched((prev) => new Set(prev).add("zipFile"));
+      reveal(["zipFile", "repoUrl"], next);
+      return;
+    }
+    // While typing, errors may only go away, never appear.
+    const all = validateAuditForm(next);
+    setErrors((prev) => {
+      const fixed = (Object.keys(prev) as FieldName[]).filter((field) => !all[field]);
+      if (fixed.length === 0) return prev;
+      const kept = { ...prev };
+      for (const field of fixed) delete kept[field];
+      return kept;
+    });
+  }
+
+  function onBlur(key: FieldName) {
+    const nextTouched = new Set(touched).add(key);
+    setTouched(nextTouched);
+    reveal(
+      current.fields.filter((field) => nextTouched.has(field)),
+      values,
+    );
+  }
+
+  function forget(fields: readonly FieldName[]) {
+    setErrors((prev) => {
+      const next = { ...prev };
+      for (const field of fields) delete next[field];
+      return next;
+    });
+    setTouched((prev) => {
+      const next = new Set(prev);
+      for (const field of fields) next.delete(field);
+      return next;
+    });
+  }
+
+  function onSourceChange(next: CodeSource) {
+    setSource(next);
+    // One input at a time: drop the value of the hidden one.
+    setValues((prev) => (next === "zip" ? { ...prev, repoUrl: "" } : { ...prev, zipFile: null }));
+    forget(["repoUrl", "zipFile"]);
+  }
+
+  function goTo(index: number) {
+    setDirection(index >= step ? 1 : -1);
+    setStep(index);
+    setFurthest((prev) => Math.max(prev, index));
+    setNavigated(true);
+  }
+
+  function next() {
+    const invalid = reveal(current.fields, values);
+    setTouched((prev) => new Set([...prev, ...current.fields]));
+    if (invalid.length > 0) {
+      const first = invalid[0]!;
+      const id =
+        first === "repoUrl" && source === "zip" ? FIELD_INPUT_ID.zipFile : FIELD_INPUT_ID[first];
+      document.getElementById(id)?.focus();
+      return;
+    }
+    const filled = current.fields.some((field) => !isEmpty(values[field]));
+    setOutcomes((prev) => ({
+      ...prev,
+      [step]: current.optional && !filled ? "skipped" : "done",
+    }));
+    goTo(step + 1);
+  }
+
+  function skip() {
+    setValues((prev) => {
+      const cleared = { ...prev };
+      for (const field of current.fields) {
+        if (field !== "zipFile") cleared[field] = "";
+      }
+      return cleared;
+    });
+    forget(current.fields);
+    setOutcomes((prev) => ({ ...prev, [step]: "skipped" }));
+    goTo(step + 1);
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!isReview) {
+      next();
+      return;
+    }
     const nextErrors = validateAuditForm(values);
     setErrors(nextErrors);
-    setAttempted(true);
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      goTo(Math.max(firstStepWithError(nextErrors), 0));
+      return;
+    }
 
     const input: CreateRunInput = {
       projectName: values.projectName,
@@ -97,207 +265,107 @@ export function AuditForm() {
     }
   }
 
+  const statuses: StepStatus[] = STEPS.map((_, index) =>
+    index === step ? "current" : (outcomes[index] ?? "upcoming"),
+  );
+
+  const fieldProps = { values, errors, onChange: setValue, onBlur, disabled: submitting };
+
   return (
-    <form onSubmit={onSubmit} noValidate className="flex max-w-prose flex-col gap-8">
-      <section aria-labelledby="project-heading" className="flex flex-col gap-4">
-        <h2 id="project-heading" className="text-xl font-semibold tracking-tight">
-          Your project
-        </h2>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="project-name" className={labelClasses}>
-            Project name
-          </label>
-          <input
-            id="project-name"
-            type="text"
-            autoComplete="off"
-            maxLength={200}
-            value={values.projectName}
-            onChange={(event) => setValue("projectName", event.target.value)}
-            aria-invalid={Boolean(errors.projectName)}
-            aria-describedby={errors.projectName ? "project-name-error" : undefined}
-            disabled={submitting}
-            placeholder="pocket-notes"
-            className={inputClasses}
-          />
-          <FieldError message={errors.projectName} id="project-name-error" />
-        </div>
-      </section>
+    <form
+      onSubmit={onSubmit}
+      noValidate
+      aria-label="Run an audit"
+      className="grid gap-6 lg:grid-cols-[12rem_minmax(0,40rem)] lg:gap-12"
+    >
+      <div className="lg:sticky lg:top-24 lg:self-start">
+        <Stepper
+          current={step}
+          statuses={statuses}
+          furthest={furthest}
+          onSelect={goTo}
+          disabled={submitting}
+        />
+      </div>
 
-      <section aria-labelledby="code-heading" className="flex flex-col gap-4">
-        <h2 id="code-heading" className="text-xl font-semibold tracking-tight">
-          Your code
-        </h2>
-        <p className="-mt-2 max-w-prose text-sm text-muted-foreground">
-          Add one of these. The code is read, never installed or run.
-        </p>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="repo-url" className={labelClasses}>
-            GitHub repo URL
-          </label>
-          <input
-            id="repo-url"
-            type="url"
-            autoComplete="off"
-            value={values.repoUrl}
-            onChange={(event) => setValue("repoUrl", event.target.value)}
-            aria-invalid={Boolean(errors.repoUrl)}
-            aria-describedby={errors.repoUrl ? "repo-url-error" : undefined}
-            disabled={submitting}
-            placeholder="https://github.com/owner/repo"
-            className={cn(inputClasses, "font-mono text-[0.85rem]")}
-          />
-          <FieldError message={errors.repoUrl} id="repo-url-error" />
+      <div className="flex min-w-0 flex-col gap-5">
+        <div className="overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-card sm:p-8">
+          <m.div
+            key={step}
+            initial={navigated ? { opacity: 0, x: direction * 16 } : false}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.24, ease: EASE_OUT }}
+          >
+            <StepPanel index={step} focusOnMount={navigated}>
+              {current.id === "code" ? (
+                <CodeStep {...fieldProps} source={source} onSourceChange={onSourceChange} />
+              ) : current.id === "live" ? (
+                <LiveSiteStep {...fieldProps} />
+              ) : current.id === "login" ? (
+                <TestLoginStep {...fieldProps} />
+              ) : (
+                <ReviewStep values={values} onEdit={goTo} disabled={submitting} />
+              )}
+            </StepPanel>
+          </m.div>
         </div>
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <span aria-hidden="true" className="h-px flex-1 bg-border" />
-          or
-          <span aria-hidden="true" className="h-px flex-1 bg-border" />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="zip-file" className={labelClasses}>
-            Zip upload <span className="text-muted-foreground">(max 10 MB)</span>
-          </label>
-          <input
-            id="zip-file"
-            type="file"
-            accept=".zip,application/zip"
-            onChange={onZipChange}
-            aria-invalid={Boolean(errors.zipFile)}
-            aria-describedby={errors.zipFile ? "zip-file-error" : "zip-file-help"}
-            disabled={submitting}
-            className="rounded-md border border-input bg-card px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium"
-          />
-          <p id="zip-file-help" className="text-xs text-muted-foreground">
-            {values.zipFile
-              ? `Selected: ${values.zipFile.name} (${formatFileSize(values.zipFile.size)})`
-              : "A zip of the project source."}
-          </p>
-          <FieldError message={errors.zipFile} id="zip-file-error" />
-        </div>
-      </section>
 
-      <section aria-labelledby="live-heading" className="flex flex-col gap-4">
-        <h2 id="live-heading" className="text-xl font-semibold tracking-tight">
-          Your live app <span className="text-base font-normal text-muted-foreground">(optional)</span>
-        </h2>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="live-url" className={labelClasses}>
-            Live URL
-          </label>
-          <input
-            id="live-url"
-            type="url"
-            autoComplete="off"
-            value={values.liveUrl}
-            onChange={(event) => setValue("liveUrl", event.target.value)}
-            aria-invalid={Boolean(errors.liveUrl)}
-            aria-describedby={errors.liveUrl ? "live-url-error" : "live-url-help"}
-            disabled={submitting}
-            placeholder="https://app.example.com"
-            className={cn(inputClasses, "font-mono text-[0.85rem]")}
-          />
-          <p id="live-url-help" className="text-xs text-muted-foreground">
-            The running app. Live checks only start after you verify you own the
-            domain.
+        {apiError ? (
+          <p
+            role="alert"
+            className="flex items-start gap-2 rounded-xl border border-sev-critical/30 bg-sev-critical-tint px-4 py-3 text-sm text-sev-critical-fg"
+          >
+            <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            <span>The audit could not start: {apiError}</span>
           </p>
-          <FieldError message={errors.liveUrl} id="live-url-error" />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="domain-token" className={labelClasses}>
-            Domain verification token
-          </label>
-          <input
-            id="domain-token"
-            type="text"
-            autoComplete="off"
-            value={values.domainToken}
-            onChange={(event) => setValue("domainToken", event.target.value)}
-            aria-invalid={Boolean(errors.domainToken)}
-            aria-describedby={
-              errors.domainToken ? "domain-token-error" : "domain-token-help"
-            }
-            disabled={submitting}
-            className={cn(inputClasses, "font-mono text-[0.85rem]")}
-          />
-          <p id="domain-token-help" className="text-xs text-muted-foreground">
-            Pick any token and publish it on your site first: a file at
-            /.well-known/launchaudit-verification.txt, or a meta tag named
-            launchaudit-verification on your home page. Without it, live checks
-            are skipped.
-          </p>
-          <FieldError message={errors.domainToken} id="domain-token-error" />
-        </div>
-      </section>
+        ) : null}
 
-      <section aria-labelledby="journey-heading" className="flex flex-col gap-4">
-        <h2 id="journey-heading" className="text-xl font-semibold tracking-tight">
-          Journey login <span className="text-base font-normal text-muted-foreground">(optional)</span>
-        </h2>
-        <p className="-mt-2 max-w-prose text-sm text-muted-foreground">
-          A test account the audit uses to walk the journey: sign up, log in,
-          add to cart, check out. It is used once for this run and never stored.
-        </p>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="journey-email" className={labelClasses}>
-              Journey test email
-            </label>
-            <input
-              id="journey-email"
-              type="email"
-              autoComplete="off"
-              value={values.journeyEmail}
-              onChange={(event) => setValue("journeyEmail", event.target.value)}
-              aria-invalid={Boolean(errors.journeyEmail)}
-              aria-describedby={
-                errors.journeyEmail ? "journey-email-error" : undefined
-              }
+        <div className="flex items-center gap-2 max-sm:sticky max-sm:bottom-0 max-sm:z-30 max-sm:-mx-4 max-sm:border-t max-sm:border-border max-sm:bar-solid max-sm:px-4 max-sm:pt-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          {step > 0 ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              onMouseDown={keepFocus}
+              onClick={() => goTo(step - 1)}
               disabled={submitting}
-              placeholder="tester@example.com"
-              className={inputClasses}
-            />
-            <FieldError message={errors.journeyEmail} id="journey-email-error" />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="journey-password" className={labelClasses}>
-              Journey test password
-            </label>
-            <input
-              id="journey-password"
-              type="password"
-              autoComplete="off"
-              value={values.journeyPassword}
-              onChange={(event) => setValue("journeyPassword", event.target.value)}
-              aria-invalid={Boolean(errors.journeyPassword)}
-              aria-describedby={
-                errors.journeyPassword ? "journey-password-error" : undefined
-              }
-              disabled={submitting}
-              className={inputClasses}
-            />
-            <FieldError message={errors.journeyPassword} id="journey-password-error" />
+            >
+              Back
+            </Button>
+          ) : null}
+          <div className="ml-auto flex items-center gap-2">
+            {current.optional ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="lg"
+                onMouseDown={keepFocus}
+                onClick={skip}
+                disabled={submitting}
+              >
+                Skip this step
+              </Button>
+            ) : null}
+            {isReview ? (
+              <Button
+                key="run"
+                type="submit"
+                size="lg"
+                disabled={submitting}
+                onClick={(event) => {
+                  // The second click of a double-click on Next lands here.
+                  if (event.detail > 1) event.preventDefault();
+                }}
+              >
+                {submitting ? "Starting audit…" : "Run audit"}
+              </Button>
+            ) : (
+              <Button key="next" type="submit" size="lg" onMouseDown={keepFocus}>
+                Next
+              </Button>
+            )}
           </div>
         </div>
-      </section>
-
-      {apiError ? (
-        <p role="alert" className="flex items-start gap-2 text-sm text-sev-critical-fg">
-          <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-          <span>The audit could not start: {apiError}</span>
-        </p>
-      ) : null}
-
-      <div className="flex flex-col gap-3 border-t pt-6">
-        <div>
-          <Button type="submit" size="lg" disabled={submitting}>
-            {submitting ? "Starting audit…" : "Run audit"}
-          </Button>
-        </div>
-        <p className="max-w-prose text-sm text-muted-foreground">
-          No account needed. The run is reachable from its link, so keep the
-          link safe.
-        </p>
       </div>
     </form>
   );

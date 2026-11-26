@@ -9,9 +9,9 @@ export const metadata: Metadata = {
 
 export default function NewAuditPage() {
   return (
-    <div className="container-page flex flex-col gap-8 py-10 sm:py-14">
+    <div className="container-page flex flex-col gap-8 py-8 sm:py-12">
       <PageHeader title="Run an audit">
-        Add your code and your live URL, then press Run.
+        Four short steps. Only your code is required.
       </PageHeader>
       <AuditForm />
     </div>

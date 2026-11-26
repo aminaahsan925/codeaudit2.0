@@ -27,6 +27,22 @@ function jsonResponse(route: Route, body: unknown, status = 200) {
   });
 }
 
+/** Fills the Code step with a repo, skips Live site and Test login, then runs. */
+async function runRepoAudit(page: Page) {
+  await page.goto("/audits/new");
+  await page.getByLabel("Project name").fill("pocket-notes");
+  await page
+    .getByLabel("GitHub repo URL")
+    .fill("https://github.com/example/pocket-notes");
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 2, name: /Your live site/ })).toBeFocused();
+  await page.getByRole("button", { name: "Skip this step" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: /Test login/ })).toBeFocused();
+  await page.getByRole("button", { name: "Skip this step" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: /Review and run/ })).toBeVisible();
+  await page.getByRole("button", { name: "Run audit" }).click();
+}
+
 test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ colorScheme: "light" });
   await mockHealthOk(page);
@@ -36,12 +52,13 @@ test.describe("new audit form", () => {
   test("shows validation errors without submitting", async ({ page }) => {
     await page.goto("/audits/new");
 
-    await page.getByRole("button", { name: "Run audit" }).click();
+    await page.getByRole("button", { name: "Next", exact: true }).click();
 
     await expect(page.getByText("Enter a project name.")).toBeVisible();
     await expect(
       page.getByText("Add a GitHub repo URL or upload a zip file.").first(),
     ).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: /Your code/ })).toBeVisible();
     await expect(page).toHaveURL(/\/audits\/new$/);
   });
 
@@ -65,24 +82,20 @@ test.describe("new audit form", () => {
       jsonResponse(route, reportPayload()),
     );
 
-    await page.goto("/audits/new");
-    await page.getByLabel("Project name").fill("pocket-notes");
-    await page
-      .getByLabel("GitHub repo URL")
-      .fill("https://github.com/example/pocket-notes");
-    await page.getByRole("button", { name: "Run audit" }).click();
+    await runRepoAudit(page);
 
     await expect(page).toHaveURL(`/audits/${RUN_ID}`, { timeout: 15_000 });
     await expect(
-      page.getByRole("heading", { level: 1, name: "Audit: pocket-notes" }),
+      page.getByRole("heading", { level: 1, name: "pocket-notes" }),
     ).toBeVisible();
     await expect(page.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "40");
 
     await expect(page.getByText("Audit complete")).toBeVisible({ timeout: 15_000 });
-    await page.getByRole("link", { name: "View the Launch Report" }).click();
+    await expect(page.getByRole("link", { name: "Open the report" })).toBeVisible();
 
+    // The finished run opens its report by itself after a short pause.
     await expect(page).toHaveURL(`/reports/${RUN_ID}`, { timeout: 15_000 });
-    await expect(page.getByText("Fix first", { exact: true })).toBeVisible();
+    await expect(page.getByText("Fix first", { exact: true }).first()).toBeVisible();
     await expect(
       page.getByText("Database admin key is shipped to the browser"),
     ).toBeVisible();
@@ -100,12 +113,7 @@ test.describe("new audit form", () => {
       return route.abort("blockedbyclient");
     });
 
-    await page.goto("/audits/new");
-    await page.getByLabel("Project name").fill("pocket-notes");
-    await page
-      .getByLabel("GitHub repo URL")
-      .fill("https://github.com/example/pocket-notes");
-    await page.getByRole("button", { name: "Run audit" }).click();
+    await runRepoAudit(page);
 
     await expect(
       page.getByText("The audit could not start: Too many audits this hour."),
@@ -126,12 +134,7 @@ test.describe("history", () => {
       jsonResponse(route, runPayload({ status: "succeeded", progress: 100 })),
     );
 
-    await page.goto("/audits/new");
-    await page.getByLabel("Project name").fill("pocket-notes");
-    await page
-      .getByLabel("GitHub repo URL")
-      .fill("https://github.com/example/pocket-notes");
-    await page.getByRole("button", { name: "Run audit" }).click();
+    await runRepoAudit(page);
     await expect(page).toHaveURL(`/audits/${RUN_ID}`, { timeout: 15_000 });
 
     await page.goto("/reports");
