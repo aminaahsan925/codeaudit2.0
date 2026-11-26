@@ -1,13 +1,28 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Request } from "@playwright/test";
 
-const CORS = { "access-control-allow-origin": "*" };
+/**
+ * CORS headers that mirror the real API. The app sends the session cookie
+ * with every call (credentials: "include"), and browsers reject credentialed
+ * responses whose Access-Control-Allow-Origin is "*": the mock must echo the
+ * page origin and allow credentials, exactly like the backend does.
+ */
+function corsHeaders(request: Request): Record<string, string> {
+  return {
+    "access-control-allow-origin":
+      request.headers()["origin"] ?? "http://localhost:3000",
+    "access-control-allow-credentials": "true",
+    "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+    "access-control-allow-headers": "Authorization, Content-Type",
+    vary: "Origin",
+  };
+}
 
 async function mockHealthOk(page: Page) {
   await page.route("**/api/health", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
-      headers: CORS,
+      headers: corsHeaders(route.request()),
       body: JSON.stringify({ status: "ok", version: "0.1.0" }),
     }),
   );
@@ -27,7 +42,8 @@ test.describe("landing page", () => {
     ).toBeVisible();
 
     await page.getByRole("link", { name: "Run an audit" }).first().click();
-    await expect(page).toHaveURL(/\/audits\/new$/);
+    // The audit route compiles on first hit in dev; allow extra time.
+    await expect(page).toHaveURL(/\/audits\/new$/, { timeout: 15_000 });
     await expect(page.getByRole("heading", { level: 1, name: "Run an audit" })).toBeVisible();
   });
 });
@@ -46,7 +62,7 @@ test.describe("API health badge", () => {
       route.fulfill({
         status: 503,
         contentType: "application/json",
-        headers: CORS,
+        headers: corsHeaders(route.request()),
         body: JSON.stringify({
           error: { code: "internal_error", message: "Service unavailable" },
         }),
