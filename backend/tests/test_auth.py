@@ -23,7 +23,13 @@ def test_me_with_valid_token(client: TestClient, api_token: str) -> None:
     response = client.get("/api/auth/me", headers={"Authorization": f"Bearer {api_token}"})
 
     assert response.status_code == 200
-    assert response.json() == {"subject": "dev"}
+    assert response.json() == {
+        "subject": "dev",
+        "email": None,
+        "name": None,
+        "picture_url": None,
+        "demo": False,
+    }
 
 
 def test_me_without_header_is_401(client: TestClient) -> None:

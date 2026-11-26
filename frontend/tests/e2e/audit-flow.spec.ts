@@ -1,18 +1,33 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Page, type Request, type Route } from "@playwright/test";
 
 import { NEW_RUN_ID, reportPayload, runPayload, RUN_ID, SHARE_TOKEN } from "./fixtures";
 
 // New routes compile on first hit in dev; allow extra time for that.
 test.setTimeout(60_000);
 
-const CORS = { "access-control-allow-origin": "*" };
+/**
+ * CORS headers that mirror the real API. The app sends the session cookie
+ * with every call (credentials: "include"), and browsers reject credentialed
+ * responses whose Access-Control-Allow-Origin is "*": the mock must echo the
+ * page origin and allow credentials, exactly like the backend does.
+ */
+function corsHeaders(request: Request): Record<string, string> {
+  return {
+    "access-control-allow-origin":
+      request.headers()["origin"] ?? "http://localhost:3000",
+    "access-control-allow-credentials": "true",
+    "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+    "access-control-allow-headers": "Authorization, Content-Type",
+    vary: "Origin",
+  };
+}
 
 async function mockHealthOk(page: Page) {
   await page.route("**/api/health", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
-      headers: CORS,
+      headers: corsHeaders(route.request()),
       body: JSON.stringify({ status: "ok", version: "0.1.0" }),
     }),
   );
@@ -22,7 +37,7 @@ function jsonResponse(route: Route, body: unknown, status = 200) {
   return route.fulfill({
     status,
     contentType: "application/json",
-    headers: CORS,
+    headers: corsHeaders(route.request()),
     body: JSON.stringify(body),
   });
 }
@@ -154,11 +169,7 @@ test.describe("rerun", () => {
       if (route.request().method() === "OPTIONS") {
         return route.fulfill({
           status: 204,
-          headers: {
-            ...CORS,
-            "access-control-allow-methods": "POST, OPTIONS",
-            "access-control-allow-headers": "content-type",
-          },
+          headers: corsHeaders(route.request()),
         });
       }
       return jsonResponse(

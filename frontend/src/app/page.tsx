@@ -1,5 +1,6 @@
 import { ButtonLink } from "@/components/button-link";
 import { SampleReport } from "@/components/sample-report";
+import { SignInButton } from "@/components/sign-in-button";
 
 const STEPS = [
   {
@@ -68,6 +69,7 @@ export default function HomePage() {
                 View reports
               </ButtonLink>
             </div>
+            <SignInButton />
             <p className="max-w-prose text-sm text-muted-foreground">
               Your code is read, never executed. Live checks only start after
               you verify that you own the domain.

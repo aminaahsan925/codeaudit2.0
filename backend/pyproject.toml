@@ -5,12 +5,14 @@ description = "LaunchAudit API"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "alembic>=1.20",
+    "cryptography>=42",
     "fastapi>=0.165",
     "httpx>=0.28",
     "playwright>=1.49",
     "psycopg[binary]>=3.3",
     "pydantic>=2.14",
     "pydantic-settings>=2.16",
+    "pyjwt>=2.10",
     "python-multipart>=0.0.20",
     "reportlab>=4.2",
     "sqlalchemy>=2.1",

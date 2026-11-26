@@ -33,6 +33,7 @@ ENV_FILE = BACKEND_DIR / ".env"
 DATABASE_URL_SCHEME = "postgresql+psycopg://"
 SQLITE_DATABASE_URL_SCHEME = "sqlite://"
 MIN_API_AUTH_TOKEN_LENGTH = 32
+MIN_SESSION_SECRET_LENGTH = 32
 
 Environment = Literal["development", "test", "production"]
 LogLevel = Literal["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"]
@@ -90,6 +91,16 @@ class Settings(BaseSettings):
     gemini_api_key: SecretStr | None = None
     groq_api_key: SecretStr | None = None
     audit_rate_limit_per_hour: int = Field(default=10, gt=0)
+    # Google sign-in (all optional: the app runs fully without them, with
+    # guest runs and demo sign-in instead). See docs/google-signin-setup.md.
+    google_client_id: str | None = None
+    google_client_secret: SecretStr | None = None
+    google_redirect_uri: str | None = None
+    # Signs session tokens (HS256). Unset or short means no session can be
+    # issued, so sign-in is unavailable; it never fails open.
+    session_secret: SecretStr | None = None
+    # Public origin of the frontend; the Google callback redirects here.
+    frontend_url: str = "http://localhost:3000"
 
     @field_validator("database_url")
     @classmethod
@@ -114,6 +125,34 @@ class Settings(BaseSettings):
         if isinstance(value, str) and not value.strip():
             return None
         return value
+
+    @field_validator(
+        "google_client_id",
+        "google_client_secret",
+        "google_redirect_uri",
+        "session_secret",
+        mode="before",
+    )
+    @classmethod
+    def _empty_auth_value_is_unset(cls, value: Any) -> Any:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator("session_secret")
+    @classmethod
+    def _check_session_secret_strength(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is not None and len(value.get_secret_value()) < MIN_SESSION_SECRET_LENGTH:
+            raise ValueError(f"must be at least {MIN_SESSION_SECRET_LENGTH} characters long")
+        return value
+
+    @field_validator("frontend_url")
+    @classmethod
+    def _check_frontend_url(cls, value: str) -> str:
+        url = value.strip().rstrip("/")
+        if not (url.startswith("http://") or url.startswith("https://")):
+            raise ValueError("must be an absolute http(s) URL")
+        return url
 
     @field_validator("api_auth_token")
     @classmethod
@@ -146,6 +185,11 @@ class Settings(BaseSettings):
                 "API_AUTH_TOKEN must not be set in production: the shared-token auth stub "
                 "is for development and test only"
             )
+        if self.google_configured and self.session_secret is None:
+            problems.append(
+                "SESSION_SECRET must be set in production when Google sign-in is "
+                "configured, or sign-in is silently unavailable"
+            )
         if problems:
             raise ValueError("; ".join(problems))
         return self
@@ -153,6 +197,18 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
+
+    @property
+    def google_configured(self) -> bool:
+        """True when all three Google OAuth values are set."""
+        return bool(
+            self.google_client_id and self.google_client_secret and self.google_redirect_uri
+        )
+
+    @property
+    def sessions_available(self) -> bool:
+        """True when session tokens can be issued (a secret is configured)."""
+        return self.session_secret is not None
 
 
 class _ExplicitSettings(Settings):

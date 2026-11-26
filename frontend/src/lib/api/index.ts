@@ -4,6 +4,19 @@ export { ApiError, isApiError } from "./errors";
 export type { ApiErrorCode } from "./errors";
 export { getHealth } from "./health";
 export type { Health } from "./health";
+export {
+  demoLogin,
+  getMe,
+  getProviders,
+  googleLoginUrl,
+  logout,
+} from "./auth";
+export type {
+  MeResponse,
+  ProvidersResponse,
+  SessionResponse,
+  UserResponse,
+} from "./auth";
 export { createRun, getRun, rerunRun, CREATE_RUN_TIMEOUT_MS } from "./runs";
 export type {
   AuditRun,
