@@ -12,6 +12,8 @@ MakeClient = Callable[..., TestClient]
 PRODUCTION: dict[str, Any] = {
     "environment": "production",
     "cors_origins": ["https://app.example.com"],
+    "frontend_url": "https://app.example.com",
+    "session_secret": "test-session-secret-for-production-tests",
 }
 
 

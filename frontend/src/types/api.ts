@@ -37,7 +37,10 @@ export interface paths {
          * Google sign-in callback
          * @description Finish Google sign-in: verify the state, swap the code, sign the user
          *     in, and send the browser back to the frontend. The session token travels
-         *     as an HttpOnly cookie on the redirect, never in the URL.
+         *     as an HttpOnly cookie on the redirect, never in the URL. Every failure
+         *     (Google sent an `error`, a bad state, a failed token exchange or
+         *     verification) redirects to the frontend sign-in page with an error flag
+         *     instead of returning a JSON error to the browser.
          */
         get: operations["google_callback_api_auth_google_callback_get"];
         put?: never;
@@ -702,15 +705,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
             };
             /** @description Validation Error */
             422: {

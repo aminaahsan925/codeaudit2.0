@@ -3,6 +3,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from app.core.config import Settings
 from app.main import create_app
@@ -87,8 +88,17 @@ def test_require_auth_rejects_in_production_even_with_a_configured_token(
     settings_factory: SettingsFactory, api_token: str
 ) -> None:
     # Settings validation forbids this combination; model_copy skips validation to
-    # prove the dependency itself refuses to authenticate in production.
-    settings = settings_factory().model_copy(update={"environment": "production"})
+    # prove the dependency itself refuses to authenticate in production. The
+    # session secret and https frontend URL keep startup validation satisfied,
+    # so only the auth behaviour is under test.
+    settings = settings_factory().model_copy(
+        update={
+            "environment": "production",
+            "frontend_url": "https://app.example.com",
+            "cors_origins": ["https://app.example.com"],
+            "session_secret": SecretStr("test-session-secret-for-production-tests"),
+        }
+    )
     assert settings.is_production
     assert settings.api_auth_token is not None
 
@@ -100,6 +110,11 @@ def test_require_auth_rejects_in_production_even_with_a_configured_token(
 
 
 def test_require_auth_rejects_in_production_without_a_token(make_client: MakeClient) -> None:
-    client = make_client(environment="production", cors_origins=["https://app.example.com"])
+    client = make_client(
+        environment="production",
+        cors_origins=["https://app.example.com"],
+        frontend_url="https://app.example.com",
+        session_secret="test-session-secret-for-production-tests",  # noqa: S106 - test value
+    )
 
     assert_unauthorized(client.get("/api/auth/me", headers={"Authorization": "Bearer anything"}))

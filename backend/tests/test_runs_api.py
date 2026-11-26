@@ -25,6 +25,7 @@ from app.api.routers import runs as runs_router
 from app.core.config import Settings
 from app.core.ratelimit import check_and_record
 from app.core.ratelimit import reset as reset_rate_limits
+from app.core.security import issue_session_token
 from app.db import get_db
 from app.main import create_app
 from app.models import Base
@@ -45,10 +46,10 @@ def _zip_bytes(files: dict[str, str]) -> bytes:
 
 
 @pytest.fixture(autouse=True)
-def _fresh_rate_limits() -> Iterator[None]:
-    reset_rate_limits()
+def _fresh_rate_limits(db_session: Session) -> Iterator[None]:
+    reset_rate_limits(db_session)
     yield
-    reset_rate_limits()
+    reset_rate_limits(db_session)
 
 
 @pytest.fixture
@@ -260,12 +261,51 @@ def test_rate_limit_returns_429(
     }
 
 
-def test_rate_limit_is_per_key() -> None:
-    assert check_and_record("ip:1.2.3.4", 1) is True
-    assert check_and_record("ip:1.2.3.4", 1) is False
-    assert check_and_record("ip:5.6.7.8", 1) is True
-    reset_rate_limits()
-    assert check_and_record("ip:1.2.3.4", 1) is True
+def test_rate_limit_is_per_key(db_session: Session) -> None:
+    assert check_and_record(db_session, "ip:1.2.3.4", 1) is True
+    assert check_and_record(db_session, "ip:1.2.3.4", 1) is False
+    assert check_and_record(db_session, "ip:5.6.7.8", 1) is True
+    reset_rate_limits(db_session)
+    assert check_and_record(db_session, "ip:1.2.3.4", 1) is True
+
+
+def test_rate_limit_counters_are_shared_across_sessions(db_session: Session) -> None:
+    """Two sessions on one database (two server instances, or one instance
+    after a restart) agree on the count: the limit lives in the database,
+    not in process memory."""
+    maker = sessionmaker(bind=db_session.get_bind(), autoflush=False, expire_on_commit=False)
+    with maker() as other_session:
+        assert check_and_record(db_session, "user:shared", 2) is True
+        assert check_and_record(other_session, "user:shared", 2) is True
+        assert check_and_record(db_session, "user:shared", 2) is False
+
+
+def test_cookie_session_user_has_own_rate_limit_bucket(
+    make_runs_client: Callable[..., TestClient],
+) -> None:
+    """A signed-in user (session cookie) is limited by user id, not by the
+    shared client IP: exhausting their bucket does not limit a guest from
+    the same address, and vice versa."""
+    secret = "test-session-secret-for-rate-limit-tests"  # noqa: S105 - test value
+    client = make_runs_client(audit_rate_limit_per_hour=1, session_secret=secret)
+    token = issue_session_token(
+        secret,
+        user_id=uuid4(),
+        email="owner@example.com",
+        name="Owner",
+        picture_url=None,
+        demo=False,
+    )
+    payload = {"project_name": "Shop", "repo_url": "https://github.com/example/shop"}
+    cookies = {"launchaudit_session": token}
+
+    assert client.post("/api/runs", data=payload, cookies=cookies).status_code == 201
+    response = client.post("/api/runs", data=payload, cookies=cookies)
+    assert response.status_code == 429
+    assert response.json()["error"]["code"] == "rate_limited"
+
+    # Same client IP, no cookie: the guest bucket is untouched.
+    assert client.post("/api/runs", data=payload).status_code == 201
 
 
 def test_rate_limit_applies_to_rerun(make_runs_client: Callable[..., TestClient]) -> None:

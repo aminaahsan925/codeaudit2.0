@@ -8,6 +8,7 @@ Everything else receives a `Settings` instance (via `get_settings()` or
 from __future__ import annotations
 
 import json
+import logging
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -26,6 +27,8 @@ from pydantic_settings import (
     PydanticBaseSettingsSource,
     SettingsConfigDict,
 )
+
+logger = logging.getLogger(__name__)
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ENV_FILE = BACKEND_DIR / ".env"
@@ -247,6 +250,46 @@ def _describe_errors(exc: ValidationError) -> str:
             detail = str(error.get("msg", "is invalid")).removeprefix("Value error, ")
         problems.append(f"{name} {detail}" if name else detail)
     return "; ".join(dict.fromkeys(problems))
+
+
+def validate_startup_config(settings: Settings) -> None:
+    """Fail startup on configuration that would silently break sign-in.
+
+    Called by the app factory once settings are loaded. The per-field rules
+    in `Settings` cannot express these: sign-in depends on values matching
+    the real deployment (HTTPS origins, the redirect URI Google sends the
+    browser back to) and on SESSION_SECRET existing at all. Without a
+    session secret sign-in used to disappear silently; now production
+    refuses to start, and other environments log a loud warning so the
+    missing feature is never a surprise. Messages name the variables but
+    never their values.
+    """
+    problems: list[str] = []
+    if settings.session_secret is None:
+        if settings.is_production:
+            problems.append(
+                "SESSION_SECRET must be set in production: without it sign-in is disabled"
+            )
+        else:
+            logger.warning(
+                "SESSION_SECRET is not set: sign-in is DISABLED in this environment. "
+                "Set SESSION_SECRET (at least %d characters) to enable Google and "
+                "demo sign-in.",
+                MIN_SESSION_SECRET_LENGTH,
+            )
+    if settings.is_production:
+        if not settings.frontend_url.startswith("https://"):
+            problems.append("FRONTEND_URL must be an https URL in production")
+        if any(not origin.startswith("https://") for origin in settings.cors_origins):
+            problems.append("CORS_ORIGINS must list https origins only in production")
+        if settings.google_configured and not (settings.google_redirect_uri or "").startswith(
+            "https://"
+        ):
+            problems.append("GOOGLE_REDIRECT_URI must be an https URL in production")
+    if problems:
+        for problem in problems:
+            logger.error("Invalid configuration: %s", problem)
+        raise SettingsError("Invalid configuration: " + "; ".join(problems))
 
 
 @lru_cache(maxsize=1)
