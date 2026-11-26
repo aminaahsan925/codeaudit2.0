@@ -1,48 +1,17 @@
 /*
-  LaunchAudit design tokens
-  =========================
+  LaunchAudit design tokens (round 2, see docs/design.md)
 
-  Source of truth for colour, type, spacing and radius. Components use the
-  Tailwind utilities generated from these tokens (bg-sev-critical-tint,
-  text-verdict-launch-fg, text-3xl, max-w-page ...). No ad-hoc colours.
+  Light first: warm canvas, white cards, ink primary actions, one cobalt
+  accent (tokens named brand-*) for the logo mark, links, focus, active nav
+  and small highlights. No gradients. Severity and verdict colours are
+  semantic and always paired with a word and a shape; Low is slate.
 
-  Colour roles (light / dark values live in :root and .dark below)
-  - Surfaces: background (page), card (raised panel), muted (sunken well),
-    border (hairlines), input (control outlines, >= 3:1 on card).
-  - Text: foreground (body, >= 13:1), muted-foreground (secondary, >= 6:1).
-  - primary: deep petrol ink used for the main action and links.
-  - Severity: critical / high / medium / low. Each has three tokens:
-      sev-<level>        solid mark colour (icons, bars, text on page bg)
-      sev-<level>-tint   badge background
-      sev-<level>-fg     badge text (>= 6.5:1 on its tint)
-    Severity is never colour alone: badges carry the word and a distinct
-    shape (octagon, triangle, diamond, circle).
-  - Verdict: launch / fix (Fix first) / block (Do not launch), same three
-    tokens per verdict, paired with a label and an icon.
+  Contrast (WCAG 2.2 AA, both themes): ink >= 14.6:1, muted ink >= 5.7:1,
+  accent >= 6.8:1, primary button text 15.7:1+, input outlines >= 3.3:1,
+  severity text on tint >= 6.6:1, severity marks >= 4.9:1.
 
-  Contrast (WCAG 2.2 AA, checked for both themes)
-  - All text pairs >= 4.5:1; every *-fg on its *-tint >= 6.6:1.
-  - Solid marks >= 3:1 on card, background and their tint; solids also
-    pass 4.5:1 as text on the page background and under white (light) or
-    ink (dark) text.
-  - Focus ring >= 5.5:1 against background and card.
-
-  Type
-  - Sans: Schibsted Grotesk (headings, UI, body). Mono: IBM Plex Mono, only
-    for code, file paths, HTTP evidence and scores.
-  - Scale (classic typographic steps): 12 / 14 / 16 / 18 / 21 / 24 / 36 / 48 / 60 px
-    as text-xs, sm, base, lg, xl, 2xl, 3xl, 4xl, 5xl.
-
-  Spacing: 4px base grid (Tailwind --spacing). Preferred steps 1, 2, 3, 4,
-  6, 8, 12, 16, 24. Page content is capped at max-w-page (76rem) with a
-  px-4 / sm:px-6 / lg:px-8 gutter.
-
-  Radius: hierarchy, not one value. rounded-sm (≈4px) badges and tags,
-  rounded-md (≈5px) buttons and inputs, rounded-lg (6px) panels,
-  rounded-xl (≈8px) large report surfaces.
-
-  Theme: class-based (.dark on <html>) set by next-themes before paint,
-  default follows prefers-color-scheme.
+  Type: Bricolage Grotesque (display, headings), Instrument Sans (UI, body),
+  IBM Plex Mono (code and evidence only).
 */
 
 @import "tailwindcss";
@@ -53,23 +22,23 @@
 
 @theme {
   --text-xs: 0.75rem;
-  --text-xs--line-height: 1rem;
+  --text-xs--line-height: 1.125rem;
   --text-sm: 0.875rem;
-  --text-sm--line-height: 1.25rem;
+  --text-sm--line-height: 1.375rem;
   --text-base: 1rem;
-  --text-base--line-height: 1.5rem;
+  --text-base--line-height: 1.625rem;
   --text-lg: 1.125rem;
   --text-lg--line-height: 1.75rem;
-  --text-xl: 1.3125rem;
-  --text-xl--line-height: 1.875rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
   --text-2xl: 1.5rem;
   --text-2xl--line-height: 2rem;
-  --text-3xl: 2.25rem;
-  --text-3xl--line-height: 2.625rem;
-  --text-4xl: 3rem;
-  --text-4xl--line-height: 3.25rem;
-  --text-5xl: 3.75rem;
-  --text-5xl--line-height: 4rem;
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 2.375rem;
+  --text-4xl: 2.5rem;
+  --text-4xl--line-height: 2.875rem;
+  --text-5xl: 3.5rem;
+  --text-5xl--line-height: 3.75rem;
 
   --container-page: 76rem;
   --container-prose: 38rem;
@@ -87,8 +56,9 @@
 }
 
 @theme inline {
-  --font-sans: var(--font-schibsted), ui-sans-serif, system-ui, sans-serif;
-  --font-heading: var(--font-schibsted), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-bricolage), var(--font-instrument), ui-sans-serif, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-instrument), ui-sans-serif, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, "Cascadia Mono", monospace;
 
   --color-background: var(--background);
@@ -133,6 +103,16 @@
   --color-verdict-block-tint: var(--verdict-block-tint);
   --color-verdict-block-fg: var(--verdict-block-fg);
   --color-on-solid: var(--on-solid);
+  --color-sunken: var(--sunken);
+  --color-brand: var(--brand);
+  --color-brand-2: var(--brand-2);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-fg: var(--brand-fg);
+  --color-on-brand: var(--on-brand);
+
+  --shadow-xs: var(--shadow-xs-value);
+  --shadow-card: var(--shadow-card-value);
+  --shadow-float: var(--shadow-float-value);
 
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -145,28 +125,43 @@
 
 :root {
   color-scheme: light;
-  --radius: 0.375rem;
+  --radius: 0.625rem;
 
   /* Surfaces and text */
-  --background: #f5f7f6;
-  --foreground: #0e1c22;
+  --background: #f6f5f2;
+  --foreground: #191817;
   --card: #ffffff;
-  --card-foreground: #0e1c22;
+  --card-foreground: #191817;
   --popover: #ffffff;
-  --popover-foreground: #0e1c22;
-  --muted: #eaefee;
-  --muted-foreground: #4a5c61;
-  --secondary: #eaefee;
-  --secondary-foreground: #0e1c22;
-  --accent: #e1e9e8;
-  --accent-foreground: #0e1c22;
-  --border: #d3dcdb;
-  --input: #7e8f91;
-  --ring: #0e6e7a;
-  --primary: #0b5560;
-  --primary-foreground: #ffffff;
+  --popover-foreground: #191817;
+  --sunken: #efede8;
+  --muted: #efede8;
+  --muted-foreground: #5f5b55;
+  --secondary: #efede8;
+  --secondary-foreground: #191817;
+  --accent: #e8edfb;
+  --accent-foreground: #191817;
+  --border: #e4e1da;
+  --input: #8a857c;
+  --ring: #2348c8;
   --destructive: #b3192b;
   --on-solid: #ffffff;
+
+  /* Brand */
+  /* Accent: deep cobalt. Logo mark, links, focus ring, active nav, small
+     highlights only. Primary actions are ink, not accent. */
+  --brand: #2348c8;
+  --brand-2: #2348c8;
+  --brand-soft: #e8edfb;
+  --brand-fg: #1b3aa6;
+  --on-brand: #ffffff;
+  --primary: #191817;
+  --primary-foreground: #f6f5f2;
+
+  /* Depth: layered shadows (light mode only) */
+  --shadow-xs-value: 0 1px 2px rgb(25 24 23 / 0.05);
+  --shadow-card-value: 0 1px 2px rgb(25 24 23 / 0.04), 0 4px 12px -2px rgb(25 24 23 / 0.06);
+  --shadow-float-value: 0 2px 4px rgb(25 24 23 / 0.04), 0 16px 32px -12px rgb(25 24 23 / 0.14);
 
   /* Severity: solid / tint / fg */
   --sev-critical: #b3192b;
@@ -178,9 +173,9 @@
   --sev-medium: #8a6300;
   --sev-medium-tint: #faf0cf;
   --sev-medium-fg: #6a4c00;
-  --sev-low: #3f6e96;
-  --sev-low-tint: #e2ecf5;
-  --sev-low-fg: #274a69;
+  --sev-low: #55606e;
+  --sev-low-tint: #e8ebef;
+  --sev-low-fg: #3a4350;
 
   /* Verdict: solid / tint / fg */
   --verdict-launch: #1c7a46;
@@ -197,25 +192,36 @@
 .dark {
   color-scheme: dark;
 
-  --background: #0b161b;
-  --foreground: #e2eaea;
-  --card: #111f25;
-  --card-foreground: #e2eaea;
-  --popover: #111f25;
-  --popover-foreground: #e2eaea;
-  --muted: #172a31;
-  --muted-foreground: #9aaeb1;
-  --secondary: #172a31;
-  --secondary-foreground: #e2eaea;
-  --accent: #1d333b;
-  --accent-foreground: #e2eaea;
-  --border: #263b42;
-  --input: #5d7379;
-  --ring: #5cc4cf;
-  --primary: #5cc4cf;
-  --primary-foreground: #062126;
+  --background: #131210;
+  --foreground: #eeebe6;
+  --card: #1b1a18;
+  --card-foreground: #eeebe6;
+  --popover: #24221f;
+  --popover-foreground: #eeebe6;
+  --sunken: #161513;
+  --muted: #24221f;
+  --muted-foreground: #a8a39b;
+  --secondary: #24221f;
+  --secondary-foreground: #eeebe6;
+  --accent: #1c2440;
+  --accent-foreground: #eeebe6;
+  --border: #2e2c28;
+  --input: #75716a;
+  --ring: #86a4ff;
   --destructive: #ff6b78;
-  --on-solid: #062126;
+  --on-solid: #131210;
+
+  --brand: #86a4ff;
+  --brand-2: #86a4ff;
+  --brand-soft: #1c2440;
+  --brand-fg: #bacbff;
+  --on-brand: #131210;
+  --primary: #eeebe6;
+  --primary-foreground: #131210;
+
+  --shadow-xs-value: 0 0 0 1px rgb(255 255 255 / 0.02);
+  --shadow-card-value: 0 0 0 1px rgb(255 255 255 / 0.02);
+  --shadow-float-value: 0 24px 48px -12px rgb(0 0 0 / 0.6);
 
   --sev-critical: #ff6b78;
   --sev-critical-tint: #3b1318;
@@ -226,9 +232,9 @@
   --sev-medium: #f2c14e;
   --sev-medium-tint: #33290c;
   --sev-medium-fg: #f7dd9a;
-  --sev-low: #7fb2de;
-  --sev-low-tint: #142a3d;
-  --sev-low-fg: #bfd9f0;
+  --sev-low: #9aa6b5;
+  --sev-low-tint: #252a31;
+  --sev-low-fg: #ced5de;
 
   --verdict-launch: #4fd18b;
   --verdict-launch-tint: #10301f;
@@ -239,6 +245,27 @@
   --verdict-block: #ff6b78;
   --verdict-block-tint: #3b1318;
   --verdict-block-fg: #ffc2c8;
+}
+
+/* Faint grid texture for the hero background. */
+@utility bg-grid-texture {
+  background-image:
+    linear-gradient(to right, color-mix(in oklab, var(--foreground) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, var(--foreground) 6%, transparent) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, black 30%, transparent 75%);
+}
+
+/* Frosted glass: overlays only (header on scroll, dialogs, command palette). */
+@utility glass {
+  background-color: color-mix(in oklab, var(--background) 88%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+/* Sticky bars: near-opaque, no backdrop blur (blur on large scrolling
+   areas caused jank, worst in dark mode). */
+@utility bar-solid {
+  background-color: color-mix(in oklab, var(--background) 96%, transparent);
 }
 
 /* Page container: content width cap plus the responsive side gutter. */
@@ -261,11 +288,18 @@
   }
   html {
     @apply font-sans;
+    font-feature-settings: "ss01", "cv11";
     -webkit-text-size-adjust: 100%;
     text-rendering: optimizeLegibility;
   }
   body {
     @apply bg-background text-foreground antialiased;
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-heading);
+    font-weight: 550;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
   }
   :focus-visible {
     outline: 2px solid var(--ring);

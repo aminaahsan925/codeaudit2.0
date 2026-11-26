@@ -57,6 +57,9 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // The dev-only indicator sits bottom-right so it never covers the sidebar's
+  // API status chip (bottom-left). Production builds never show it.
+  devIndicators: { position: "bottom-right" },
   reactStrictMode: true,
   // Stop `next dev` from writing generated guidance files into the repo.
   agentRules: false,
