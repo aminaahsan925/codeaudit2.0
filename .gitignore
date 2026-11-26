@@ -2,6 +2,8 @@
 .env
 .env.*
 !.env.example
+# Scanner test fixture with fake values only (gitleaks:allow in the file)
+!backend/tests/fixtures/vibe_app/.env.local
 
 # Node / Next.js
 node_modules/
@@ -34,6 +36,12 @@ blob-report/
 /artifacts/
 /backend/reports/
 /backend/artifacts/
+
+# Demo app runtime data (SQLite files created on first run)
+demo-app/**/shop.db
+
+# Local development database
+backend/dev.db
 
 # Personal editor-assistant settings (shared settings live in .claude/settings.json)
 .claude/settings.local.json

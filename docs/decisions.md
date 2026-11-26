@@ -54,7 +54,7 @@ when a decision changes (say what replaced it and why).
   messages. Malformed JSON is `400 bad_request`; validation failures are
   `422 validation_error` and never echo submitted values.
 - **Security middleware**: pure-ASGI security headers and request-size limit
-  (default 1 MiB, enforced on Content-Length and on streamed bodies). The
+  (default 10 MiB, enforced on Content-Length and on streamed bodies). The
   built-in FastAPI size limit is not used because it answers in plain text.
   CORS is a thin subclass of Starlette's middleware so rejected preflights also
   use the error format. Order, outermost first: security headers, CORS, size
@@ -100,12 +100,6 @@ when a decision changes (say what replaced it and why).
   (Launch/Fix first/Do not launch) tokens in light and dark mode, all
   WCAG AA; badges always pair colour with a word and a distinct shape or icon.
   Tokens live in `frontend/src/app/globals.css`.
-- **Homepage shows proof, not claims**: the hero's sample report is
-  interactive. Each finding opens to the proof a real report attaches (source
-  with the flagged line and a data-flow trace, a live HTTP exchange, or
-  response headers). "What it looks for" pairs every check with a specimen of
-  the proof it produces. Motion is limited to the one load sequence on the
-  hero mark and responses to clicks.
 - **Containers**: the backend image runs as a non-root user (uid 10001) with a
   read-only filesystem in Compose; ports bind to 127.0.0.1 only.
 - **Supply chain pinning**: Docker base images are pinned by digest, GitHub
@@ -146,6 +140,99 @@ when a decision changes (say what replaced it and why).
 - **Skills**: `frontend-design` for all UI work; Supabase skills for the
   vibe-coding checks. Pinned in `skills-lock.json`.
 - **MCP**: Context7 for current library docs; no keys required.
+
+## Launchpad build (Nov 2026)
+
+Decisions made while building features 1-10 for the LaunchPad Hacks entry.
+All feature work landed on the local integration branch
+`feat/launchpad-build`, with feature branches created from
+`feat/project-foundation` (main only holds the initial repository seed).
+
+- **Scoring**: severity weights Critical 3.0, High 2.0, Medium 1.0, Low 0.3;
+  risk score = min(10, sum of weights), one decimal. Verdict: risk <= 2.0
+  Launch, 2.1-5.0 Fix first, > 5.0 Do not launch. Implemented as pure
+  functions in `backend/app/services/report/scoring.py`.
+- **SQLite for development and test**: `DATABASE_URL` accepts `sqlite://`
+  outside production; production still requires `postgresql+psycopg://`.
+  Lets the whole stack run locally without a Postgres server. ORM types stay
+  portable (no Postgres-specific types).
+- **Request size**: `max_request_bytes` default is 10 MiB (was 1 MiB) so zip
+  uploads fit. Zip extraction additionally enforces its own caps (50 MiB
+  total, 2000 files) and rejects path traversal and symlinks.
+- **Loopback targets**: live checks and journey runs may target
+  loopback/private addresses only when `allow_loopback_live_checks` is True
+  and the environment is not production. A loopback target in that mode
+  counts as domain-verified, since localhost ownership cannot be proven
+  with a token file. Public hosts always need the verification token.
+- **Report visibility**: `GET /api/runs/{id}` and
+  `GET /api/runs/{id}/report` are public by id (run ids are unguessable
+  UUIDs), so a guest who ran an audit can open its report from the link.
+  The share token is the designed public link for sharing with others. PDF
+  download needs a bearer token or the share token. `GET /api/runs`
+  (history) needs auth.
+- **Pipeline execution**: runs execute in FastAPI `BackgroundTasks`; the
+  engine services are synchronous and run in threads. Progress is polled
+  (`GET /api/runs/{id}`); no websockets for this build.
+- **AI review never fails a run**: provider errors, timeouts, and quote
+  mismatches fall back to rule-based review for that finding, and a review
+  failure never fails the audit. A report is always produced.
+- **Reruns**: a rerun is a new run with `previous_run_id` set. Findings are
+  matched by stable key (rule + file:line / step / path); previous findings
+  absent from the new run are marked `fixed`, and the report shows resolved
+  findings plus the score change.
+- **Demo app**: `demo-app/` holds broken and fixed variants of a small shop
+  for the fail-fix-pass demo. The planted fake key is allowlisted in
+  `.gitleaks.toml`; it is a fake demo key, never a real credential.
+- **Native engine**: the built-in scan rules use engine `native`, distinct
+  from `semgrep`/`gitleaks`/`osv` tool findings.
+
+## Security review fixes (Nov 2026)
+
+A read-only security review of the Launchpad build found four issues, fixed
+before the demo:
+
+- **Journey SSRF**: the journey runner used to classify only literal IPs,
+  so a hostname resolving to a private or metadata address passed the
+  guard. The base URL is now validated with the live client's
+  DNS-resolving `assert_url_allowed` (metadata always blocked), and every
+  request the browser makes is re-checked through Playwright request
+  routing, so redirects and form actions cannot steer the browser at a
+  private address either.
+- **Journey needs verification**: the journey used to run against any URL
+  with no ownership check, so the server would sign up, log in, and click
+  Pay on third-party sites. Live checks and the journey now share one
+  verification outcome: unverified domains are skipped by both.
+- **Artifacts are screenshots only**: the artifact endpoint used to serve
+  any file in the run directory, including the uploaded source zip, which
+  defeated secret masking. It now serves only `step-*.png` screenshots;
+  the zip stays server-side for reruns.
+- **Masking covers connection strings and bare tokens**: `mask_text`
+  (both the scan and live copies) now masks the userinfo of any
+  `scheme://...@` connection string regardless of variable name, and any
+  bare token-like run of 40+ characters, so an exposed `.env` excerpt
+  cannot redistribute live credentials.
+- **Live responses are capped**: the SSRF-safe client streams responses
+  and reads at most 5 MB, so a malicious target cannot exhaust server
+  memory with a huge body.
+
+## Known risks (accepted for the judges-only demo)
+
+- **DNS-rebinding TOCTOU (live client)**: validation resolves the hostname
+  and checks every answer, but the subsequent request resolves it again
+  independently, so an attacker domain with TTL 0 could pass validation
+  with a public answer and then connect to a private address. The proper
+  fix is IP pinning (connect to the validated address with the original
+  Host header and TLS SNI). Accepted for a judges-only demo with
+  semi-trusted guests; before any open public demo, either pin the
+  validated IP or put the backend behind an egress proxy that only
+  permits public destinations.
+- **Guest reruns are public by run id**: anyone who learns a run id can
+  rerun it and flip the original run's finding statuses. Documented
+  behavior for the demo; when real auth lands, reruns must check the
+  run's owner (or require the share token for guest runs).
+- **No retention sweep**: uploaded zips and screenshots are kept
+  indefinitely under `artifact_dir`. Add a retention job before a
+  long-running deployment.
 
 ## Tooling
 

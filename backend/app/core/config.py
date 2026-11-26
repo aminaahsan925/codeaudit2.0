@@ -31,6 +31,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 ENV_FILE = BACKEND_DIR / ".env"
 
 DATABASE_URL_SCHEME = "postgresql+psycopg://"
+SQLITE_DATABASE_URL_SCHEME = "sqlite://"
 MIN_API_AUTH_TOKEN_LENGTH = 32
 
 Environment = Literal["development", "test", "production"]
@@ -77,22 +78,39 @@ class Settings(BaseSettings):
     # Required on purpose: a missing ENVIRONMENT must not silently mean "development".
     environment: Environment
     database_url: SecretStr
-    cors_origins: CommaSeparatedList = Field(default_factory=lambda: ["http://localhost:3000"])
-    max_request_bytes: int = Field(default=1_048_576, gt=0)
+    cors_origins: CommaSeparatedList = Field(
+        default_factory=lambda: ["http://localhost:3000", "http://127.0.0.1:3000"]
+    )
+    max_request_bytes: int = Field(default=10_485_760, gt=0)
     api_auth_token: SecretStr | None = None
     log_level: LogLevel = "INFO"
     app_version: str = "0.1.0"
+    artifact_dir: Path = BACKEND_DIR / "artifacts"
+    allow_loopback_live_checks: bool = False
+    gemini_api_key: SecretStr | None = None
+    groq_api_key: SecretStr | None = None
+    audit_rate_limit_per_hour: int = Field(default=10, gt=0)
 
     @field_validator("database_url")
     @classmethod
     def _check_database_url(cls, value: SecretStr) -> SecretStr:
-        if not value.get_secret_value().startswith(DATABASE_URL_SCHEME):
-            raise ValueError(f"must use the {DATABASE_URL_SCHEME} scheme")
+        url = value.get_secret_value()
+        if not (url.startswith(DATABASE_URL_SCHEME) or url.startswith(SQLITE_DATABASE_URL_SCHEME)):
+            raise ValueError(
+                f"must use the {DATABASE_URL_SCHEME} or {SQLITE_DATABASE_URL_SCHEME} scheme"
+            )
         return value
 
     @field_validator("api_auth_token", mode="before")
     @classmethod
     def _empty_token_is_unset(cls, value: Any) -> Any:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator("gemini_api_key", "groq_api_key", mode="before")
+    @classmethod
+    def _empty_ai_key_is_unset(cls, value: Any) -> Any:
         if isinstance(value, str) and not value.strip():
             return None
         return value
@@ -119,6 +137,8 @@ class Settings(BaseSettings):
         if self.environment != "production":
             return self
         problems: list[str] = []
+        if not self.database_url.get_secret_value().startswith(DATABASE_URL_SCHEME):
+            problems.append(f"DATABASE_URL must use the {DATABASE_URL_SCHEME} scheme in production")
         if "*" in self.cors_origins:
             problems.append("CORS_ORIGINS must list explicit origins in production, not '*'")
         if self.api_auth_token is not None:

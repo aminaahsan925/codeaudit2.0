@@ -6,7 +6,12 @@ import NewAuditPage from "@/app/audits/new/page";
 import ReportsPage from "@/app/reports/page";
 import { EmptyState } from "@/components/empty-state";
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
+import { renderWithQueryClient } from "./test-utils";
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/",
+  useRouter: () => ({ push: vi.fn() }),
+}));
 
 describe("EmptyState", () => {
   it("renders an h2 title, body and actions by default", () => {
@@ -43,7 +48,7 @@ describe("EmptyState", () => {
 
 describe("empty pages", () => {
   it("/reports shows its page and empty-state headings", () => {
-    render(<ReportsPage />);
+    renderWithQueryClient(<ReportsPage />);
     expect(screen.getByRole("heading", { level: 1, name: "Reports" })).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { level: 2, name: "No reports yet" }),
@@ -54,14 +59,13 @@ describe("empty pages", () => {
     );
   });
 
-  it("/audits/new shows its page and empty-state headings", () => {
-    render(<NewAuditPage />);
+  it("/audits/new shows the audit form", () => {
+    renderWithQueryClient(<NewAuditPage />);
     expect(
       screen.getByRole("heading", { level: 1, name: "Run an audit" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { level: 2, name: "Audit setup is not available yet" }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Back to home" })).toHaveAttribute("href", "/");
+    expect(screen.getByLabelText("Project name")).toBeInTheDocument();
+    expect(screen.getByLabelText("GitHub repo URL")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Run audit" })).toBeInTheDocument();
   });
 });

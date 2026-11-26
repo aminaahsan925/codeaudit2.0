@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}A&H Demo Shop{% endblock %}</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; color: #1a1a1a; background: #fafafa; }
+  header { background: #111; color: #fff; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; }
+  header a { color: #fff; text-decoration: none; margin-left: 16px; }
+  header a.brand { font-weight: 700; margin-left: 0; }
+  main { max-width: 900px; margin: 0 auto; padding: 24px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+  .card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 16px; }
+  .card h3 { margin: 0 0 8px; }
+  .price { font-weight: 700; margin: 8px 0; }
+  button, .btn { background: #111; color: #fff; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-block; font-size: 15px; }
+  input { display: block; width: 100%; max-width: 360px; padding: 10px; margin: 6px 0 14px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+  label { font-weight: 600; }
+  .note { background: #e8f5e9; border: 1px solid #a5d6a7; padding: 12px; border-radius: 6px; margin-bottom: 16px; }
+  .error { background: #fdecea; border: 1px solid #f5c6cb; padding: 12px; border-radius: 6px; margin-bottom: 16px; }
+  table { width: 100%; border-collapse: collapse; background: #fff; }
+  td, th { padding: 10px; border-bottom: 1px solid #eee; text-align: left; }
+  footer { text-align: center; color: #777; padding: 24px; font-size: 14px; }
+</style>
+</head>
+<body>
+<header>
+  <a class="brand" href="/">A&H Demo Shop</a>
+  <nav>
+    <a href="/">Shop</a>
+    <a href="/cart">Cart</a>
+    {% if user %}
+      <span>Hi, {{ user["name"] }}</span>
+      <a href="/logout">Log out</a>
+    {% else %}
+      <a href="/signup">Sign up</a>
+      <a href="/login">Log in</a>
+    {% endif %}
+  </nav>
+</header>
+<main>
+{% block content %}{% endblock %}
+</main>
+<footer>Built by Amina and Hadi, A&H Systems. Demo shop for LaunchAudit.</footer>
+</body>
+</html>

@@ -1,5 +1,4 @@
 import { ButtonLink } from "@/components/button-link";
-import { HeroMark } from "@/components/hero-mark";
 import { SampleReport } from "@/components/sample-report";
 
 const STEPS = [
@@ -21,44 +20,26 @@ const CHECKS = [
   {
     title: "Leaked secrets",
     body: "API keys, tokens and passwords committed to the repo or shipped to the browser.",
-    proofKind: "File and line",
-    proof: 'src/config.ts:12  OPENAI_API_KEY = "sk-••••"',
-  },
-  {
-    title: "Open database rules",
-    body: "Supabase tables without row level security and Firebase rules that let anyone read or write.",
-    proofKind: "Rule or policy",
-    proof: "notes table: row level security off",
-  },
-  {
-    title: "Login and access control",
-    body: "Routes that skip sign-in checks, or let one user read or change another user’s data.",
-    proofKind: "Live request as a second user",
-    proof: "GET /api/orders/88 as user B → 200 OK",
   },
   {
     title: "Injection",
     body: "User input that reaches a database query, shell command or template, traced step by step.",
-    proofKind: "Data-flow trace",
-    proof: "req.query.q → sql`…${q}` → db.query()",
   },
   {
-    title: "Request forgery and XSS",
-    body: "User-controlled URLs and HTML that reach places they should not.",
-    proofKind: "Data-flow trace",
-    proof: "searchParams.url → fetch(url)",
+    title: "Login and access control",
+    body: "Routes that skip sign-in checks, or let one user read or change another user’s data.",
   },
   {
     title: "Vulnerable dependencies",
     body: "Packages with published security advisories, and the version that fixes them.",
-    proofKind: "Package and advisory",
-    proof: "lodash 4.17.20, fixed in 4.17.21",
   },
   {
     title: "Live configuration",
     body: "Missing security headers, open CORS, exposed files and debug pages on your live URL.",
-    proofKind: "Response headers",
-    proof: "x-frame-options: (missing)",
+  },
+  {
+    title: "Request forgery and XSS",
+    body: "User-controlled URLs and HTML that reach places they should not.",
   },
 ] as const;
 
@@ -67,18 +48,19 @@ export default function HomePage() {
     <>
       <section aria-labelledby="hero-title" className="border-b">
         <div className="container-page grid gap-12 py-12 sm:py-16 lg:grid-cols-12 lg:gap-10 lg:py-24">
-          <div className="flex flex-col gap-10 lg:col-span-6 lg:self-start lg:pt-28">
+          <div className="flex flex-col gap-6 lg:col-span-6 lg:pt-6">
             <h1
               id="hero-title"
-              className="flex items-center gap-3 text-3xl font-bold tracking-[-0.035em] sm:gap-5 sm:text-5xl"
+              className="text-4xl font-bold tracking-[-0.035em] text-balance sm:text-5xl"
             >
-              <HeroMark className="size-12 sm:size-20" />
-              <span>LaunchAudit</span>
+              Check your app before you launch it.
             </h1>
-            <p className="-mt-4 max-w-[24ch] text-xl text-balance text-muted-foreground sm:text-2xl">
-              Find out if your app is safe to launch, and see the proof.
+            <p className="max-w-prose text-lg text-muted-foreground sm:text-xl">
+              Built your app with AI tools? LaunchAudit reads your code and
+              probes your live URL, then tells you plainly whether it is safe
+              to launch, and shows the proof for every problem it finds.
             </p>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3 pt-2">
               <ButtonLink href="/audits/new" size="lg">
                 Run an audit
               </ButtonLink>
@@ -86,25 +68,12 @@ export default function HomePage() {
                 View reports
               </ButtonLink>
             </div>
+            <p className="max-w-prose text-sm text-muted-foreground">
+              Your code is read, never executed. Live checks only start after
+              you verify that you own the domain.
+            </p>
           </div>
           <SampleReport className="lg:col-span-6 lg:col-start-7 xl:col-span-5 xl:col-start-8" />
-        </div>
-      </section>
-
-      <section aria-labelledby="about-title" className="border-b bg-muted/40">
-        <div className="container-page flex flex-col gap-3 py-10 sm:py-12">
-          <h2 id="about-title" className="sr-only">
-            What LaunchAudit does
-          </h2>
-          <p className="max-w-prose text-lg text-balance sm:text-xl">
-            Built your app with AI tools? LaunchAudit reads your code and
-            probes your live URL, then tells you plainly whether it is safe to
-            launch, and shows the proof for every problem it finds.
-          </p>
-          <p className="max-w-prose text-sm text-muted-foreground">
-            Your code is read, never executed. Live checks only start after you
-            verify that you own the domain.
-          </p>
         </div>
       </section>
 
@@ -134,38 +103,23 @@ export default function HomePage() {
 
       <section aria-labelledby="checks-title">
         <div className="container-page grid gap-8 py-14 sm:py-20 lg:grid-cols-12 lg:gap-10">
-          <div className="flex flex-col gap-3 lg:sticky lg:top-24 lg:col-span-4 lg:self-start">
+          <div className="flex flex-col gap-3 lg:col-span-4">
             <h2 id="checks-title" className="text-2xl font-bold tracking-tight sm:text-3xl">
               What it looks for
             </h2>
             <p className="max-w-prose text-muted-foreground">
               The problems that most often slip into apps built quickly, ranked
-              Critical, High, Medium or Low so you know what to fix first. Each
-              one comes with proof you can check yourself.
+              Critical, High, Medium or Low so you know what to fix first.
             </p>
           </div>
-          <ul className="border-t lg:col-span-8">
+          <dl className="grid border-t sm:grid-cols-2 sm:gap-x-10 lg:col-span-8">
             {CHECKS.map((check) => (
-              <li
-                key={check.title}
-                className="grid gap-x-8 gap-y-3 border-b py-5 md:grid-cols-[minmax(0,1fr)_minmax(0,18rem)]"
-              >
-                <div className="flex flex-col gap-1">
-                  <h3 className="font-semibold">{check.title}</h3>
-                  <p className="text-muted-foreground">{check.body}</p>
-                </div>
-                <div className="flex min-w-0 flex-col gap-1.5">
-                  <p className="text-xs text-muted-foreground">
-                    <span className="sr-only">Proof: </span>
-                    {check.proofKind}
-                  </p>
-                  <code className="block rounded-md border bg-card px-2.5 py-1.5 font-mono text-xs leading-5 whitespace-pre-wrap [overflow-wrap:anywhere]">
-                    {check.proof}
-                  </code>
-                </div>
-              </li>
+              <div key={check.title} className="flex flex-col gap-1 border-b py-5">
+                <dt className="font-semibold">{check.title}</dt>
+                <dd className="text-muted-foreground">{check.body}</dd>
+              </div>
             ))}
-          </ul>
+          </dl>
         </div>
       </section>
     </>

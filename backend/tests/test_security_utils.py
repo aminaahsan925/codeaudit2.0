@@ -64,3 +64,33 @@ def test_verify_bearer_token_rejects(provided: str | None, expected: SecretStr |
 def test_verify_bearer_token_handles_non_ascii() -> None:
     assert verify_bearer_token("tökén", SecretStr("tökén")) is True
     assert verify_bearer_token("tokén", SecretStr("tökén")) is False
+
+
+# ------------------------------------------------------- snippet masking
+
+
+def test_mask_text_masks_connection_string_userinfo() -> None:
+    from app.services.scan.masking import mask_text
+
+    masked = mask_text(
+        "DATABASE_URL=postgres://app_user:hunter2secret@db.internal:5432/shop"  # gitleaks:allow
+    )
+
+    assert masked == "DATABASE_URL=postgres://****@db.internal:5432/shop"
+
+
+def test_mask_text_masks_bare_long_token() -> None:
+    from app.services.scan.masking import mask_text
+
+    token = "ab12" * 16  # 64 hex chars, fake value
+    masked = mask_text(f"Authorization: Bearer {token}")
+
+    assert token not in masked
+    assert masked == "Authorization: Bearer ab12****"
+
+
+def test_mask_text_leaves_plain_urls_and_paths_alone() -> None:
+    from app.services.scan.masking import mask_text
+
+    text = "see https://example.com/docs/getting-started for the guide"
+    assert mask_text(text) == text

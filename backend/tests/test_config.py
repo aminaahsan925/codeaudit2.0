@@ -1,10 +1,17 @@
 from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from app.core.config import MIN_API_AUTH_TOKEN_LENGTH, Settings, SettingsError, get_settings
+from app.core.config import (
+    BACKEND_DIR,
+    MIN_API_AUTH_TOKEN_LENGTH,
+    Settings,
+    SettingsError,
+    get_settings,
+)
 
 DB_SECRET = "dbpass-s3cr3t-value"  # noqa: S105
 TOKEN_SECRET = "api-token-s3cr3t-value-0123456789abcdef"  # noqa: S105
@@ -31,6 +38,11 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
         "MAX_REQUEST_BYTES",
         "LOG_LEVEL",
         "APP_VERSION",
+        "ARTIFACT_DIR",
+        "ALLOW_LOOPBACK_LIVE_CHECKS",
+        "GEMINI_API_KEY",
+        "GROQ_API_KEY",
+        "AUDIT_RATE_LIMIT_PER_HOUR",
     ):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("ENVIRONMENT", "test")
@@ -138,7 +150,10 @@ def test_cors_origins_accepts_json_array(clean_env: pytest.MonkeyPatch) -> None:
 def test_cors_origins_default(clean_env: pytest.MonkeyPatch) -> None:
     clean_env.setenv("DATABASE_URL", VALID_DB_URL)
 
-    assert get_settings().cors_origins == ["http://localhost:3000"]
+    assert get_settings().cors_origins == [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
 
 
 def test_defaults(clean_env: pytest.MonkeyPatch) -> None:
@@ -148,10 +163,15 @@ def test_defaults(clean_env: pytest.MonkeyPatch) -> None:
     settings = get_settings()
 
     assert settings.environment == "development"
-    assert settings.max_request_bytes == 1_048_576
+    assert settings.max_request_bytes == 10_485_760
     assert settings.api_auth_token is None
     assert settings.log_level == "INFO"
     assert settings.is_production is False
+    assert settings.artifact_dir == BACKEND_DIR / "artifacts"
+    assert settings.allow_loopback_live_checks is False
+    assert settings.gemini_api_key is None
+    assert settings.groq_api_key is None
+    assert settings.audit_rate_limit_per_hour == 10
 
 
 def test_environment_and_log_level_are_normalised(clean_env: pytest.MonkeyPatch) -> None:
@@ -337,3 +357,79 @@ def test_explicit_settings_ignore_the_environment(
     assert settings.environment == "development"
     assert settings.app_version == "0.1.0"
     assert settings.api_auth_token is None
+
+
+@pytest.mark.parametrize("environment", ["development", "test"])
+def test_sqlite_database_url_allowed_outside_production(
+    settings_factory: SettingsFactory, environment: str
+) -> None:
+    settings = settings_factory(
+        environment=environment, database_url="sqlite:///./data/launchaudit.db"
+    )
+
+    assert settings.database_url.get_secret_value() == "sqlite:///./data/launchaudit.db"
+
+
+def test_sqlite_database_url_rejected_in_production(settings_factory: SettingsFactory) -> None:
+    with pytest.raises(ValidationError) as excinfo:
+        settings_factory(environment="production", database_url="sqlite:///./data/launchaudit.db")
+
+    assert "DATABASE_URL" in str(excinfo.value)
+
+
+def test_postgres_database_url_accepted_in_production(
+    settings_factory: SettingsFactory,
+) -> None:
+    settings = settings_factory(environment="production", database_url=VALID_DB_URL)
+
+    assert settings.is_production is True
+    assert settings.database_url.get_secret_value() == VALID_DB_URL
+
+
+def test_non_postgres_non_sqlite_scheme_rejected_in_development(
+    settings_factory: SettingsFactory,
+) -> None:
+    with pytest.raises(ValidationError):
+        settings_factory(
+            environment="development",
+            database_url="mysql://app:secret@db.internal/launchaudit",
+        )
+
+
+def test_new_settings_load_from_environment(clean_env: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    clean_env.setenv("DATABASE_URL", VALID_DB_URL)
+    clean_env.setenv("ENVIRONMENT", "development")
+    clean_env.setenv("ARTIFACT_DIR", str(tmp_path / "artifacts"))
+    clean_env.setenv("ALLOW_LOOPBACK_LIVE_CHECKS", "true")
+    clean_env.setenv("GEMINI_API_KEY", "gemini-key-value")
+    clean_env.setenv("GROQ_API_KEY", "groq-key-value")
+    clean_env.setenv("AUDIT_RATE_LIMIT_PER_HOUR", "25")
+
+    settings = get_settings()
+
+    assert settings.artifact_dir == tmp_path / "artifacts"
+    assert settings.allow_loopback_live_checks is True
+    assert settings.gemini_api_key is not None
+    assert settings.gemini_api_key.get_secret_value() == "gemini-key-value"
+    assert settings.groq_api_key is not None
+    assert settings.groq_api_key.get_secret_value() == "groq-key-value"
+    assert settings.audit_rate_limit_per_hour == 25
+
+
+def test_blank_ai_keys_are_unset(clean_env: pytest.MonkeyPatch) -> None:
+    clean_env.setenv("DATABASE_URL", VALID_DB_URL)
+    clean_env.setenv("GEMINI_API_KEY", "")
+    clean_env.setenv("GROQ_API_KEY", "   ")
+
+    settings = get_settings()
+
+    assert settings.gemini_api_key is None
+    assert settings.groq_api_key is None
+
+
+def test_non_positive_audit_rate_limit_is_rejected(clean_env: pytest.MonkeyPatch) -> None:
+    clean_env.setenv("DATABASE_URL", VALID_DB_URL)
+    clean_env.setenv("AUDIT_RATE_LIMIT_PER_HOUR", "0")
+
+    with pytest.raises(SettingsError, match="AUDIT_RATE_LIMIT_PER_HOUR"):
+        get_settings()

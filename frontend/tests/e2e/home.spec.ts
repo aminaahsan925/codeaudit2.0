@@ -22,8 +22,9 @@ test.describe("landing page", () => {
     await mockHealthOk(page);
     await page.goto("/");
 
-    await expect(page.getByRole("heading", { level: 1, name: "LaunchAudit" })).toBeVisible();
-    await expect(page.getByText("Your code is read, never executed.", { exact: false })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Check your app before you launch it." }),
+    ).toBeVisible();
 
     await page.getByRole("link", { name: "Run an audit" }).first().click();
     await expect(page).toHaveURL(/\/audits\/new$/);

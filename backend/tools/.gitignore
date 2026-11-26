@@ -1,0 +1,4 @@
+# Scanner binaries live here but are never committed; see README.md.
+*
+!README.md
+!.gitignore
