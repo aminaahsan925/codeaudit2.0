@@ -40,7 +40,7 @@ jobs:
           context: demo-app/broken
           file: demo-app/broken/Dockerfile
           push: true
-          tags: cae36c8ae193acr.azurecr.io/launchaudit-demo-broken:latest
+          tags: cae36c8ae193acr.azurecr.io/launchaudit-demo-broken:v2
 
       - name: Build and push the fixed demo shop image
         uses: docker/build-push-action@v6
@@ -48,4 +48,5 @@ jobs:
           context: demo-app/fixed
           file: demo-app/fixed/Dockerfile
           push: true
-          tags: cae36c8ae193acr.azurecr.io/launchaudit-demo-fixed:latest
+          tags: cae36c8ae193acr.azurecr.io/launchaudit-demo-fixed:v2
+          
